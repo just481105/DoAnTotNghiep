@@ -1,0 +1,183 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// 1. PHÂN QUYỀN VÀ NGƯỜI DÙNG (USERS & AUTHENTICATION)
+// -------------------------------------------------------------
+enum Role {
+  STUDENT
+  CONTENT_ADMIN
+  SUPER_ADMIN
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  fullName      String?        @map("full_name")
+  avatarUrl     String?        @map("avatar_url")
+  role          Role           @default(STUDENT)
+  streakDays    Int            @default(0) @map("streak_days")
+  xpPoints      Int            @default(0) @map("xp_points")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  sm2Stats      UserSm2Stats[]
+  examAttempts  UserExamAttempt[]
+  speakingHistory SpeakingHistory[]
+  
+  @@map("users")
+}
+
+// -------------------------------------------------------------
+// 2. KHO TỪ VỰNG & THUẬT TOÁN SM-2 (VOCABULARY & SPACED REPETITION)
+// -------------------------------------------------------------
+model Vocabulary {
+  id          String         @id @default(uuid())
+  word        String         @unique
+  pos         String         // noun, verb, adj...
+  cefrLevel   String         @map("cefr_level") // A1, A2, B1, B2, C1, C2
+  ipa         String
+  meaningVi   String         @map("meaning_vi")
+  meaningEn   String?        @map("meaning_en")
+  exampleEn   String         @map("example_en")
+  exampleVi   String?        @map("example_vi")
+  audioUrl    String?        @map("audio_url")
+  topic       String         @default("Tổng quát")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  sm2Stats    UserSm2Stats[]
+
+  @@index([topic])
+  @@map("vocabularies")
+}
+
+model UserSm2Stats {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  vocabularyId    String      @map("vocabulary_id")
+  repetitions     Int         @default(0)
+  intervalDays    Int         @default(0) @map("interval_days")
+  easinessFactor  Float       @default(2.5) @map("easiness_factor")
+  nextReviewAt    DateTime    @default(now()) @map("next_review_at")
+  lastQuality     Int         @default(0) @map("last_quality") // 0 - 5
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary      Vocabulary  @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+  @@map("user_sm2_stats")
+}
+
+// -------------------------------------------------------------
+// 3. NGÂN HÀNG ĐỀ THI & CÂU HỎI TRẮC NGHIỆM (EXAMS & QUESTIONS)
+// -------------------------------------------------------------
+enum ExamType {
+  VSTEP
+  CEFR
+  IELTS_MOCK
+  GENERAL
+}
+
+enum SkillType {
+  LISTENING
+  READING
+  WRITING
+  SPEAKING
+}
+
+model Exam {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  examType    ExamType       @default(VSTEP) @map("exam_type")
+  durationMin Int            @default(60) @map("duration_minutes")
+  totalMarks  Int            @default(100) @map("total_marks")
+  isPublished Boolean        @default(false) @map("is_published")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  questions   Question[]
+  attempts    UserExamAttempt[]
+
+  @@map("exams")
+}
+
+model Question {
+  id            String      @id @default(uuid())
+  examId        String      @map("exam_id")
+  skillType     SkillType   @default(READING) @map("skill_type")
+  passageText   String?     @map("passage_text") // Đoạn văn đọc hiểu hoặc ngữ cảnh
+  audioUrl      String?     @map("audio_url")    // File nghe Audio nếu là Listening
+  prompt        String      // Nội dung câu hỏi
+  explanation   String?     // Giải thích đáp án chi tiết
+  orderIndex    Int         @default(0) @map("order_index")
+
+  exam          Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  options       QuestionOption[]
+
+  @@map("questions")
+}
+
+model QuestionOption {
+  id          String     @id @default(uuid())
+  questionId  String     @map("question_id")
+  optionLabel String     @map("option_label") // 'A', 'B', 'C', 'D'
+  content     String     // Nội dung phương án
+  isCorrect   Boolean    @default(false) @map("is_correct")
+
+  question    Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("question_options")
+}
+
+model UserExamAttempt {
+  id            String     @id @default(uuid())
+  userId        String     @map("user_id")
+  examId        String     @map("exam_id")
+  score         Float      @default(0)
+  totalCorrect  Int        @default(0) @map("total_correct")
+  startedAt     DateTime   @default(now()) @map("started_at")
+  completedAt   DateTime?  @map("completed_at")
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam          Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@map("user_exam_attempts")
+}
+
+model SpeakingHistory {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  word            String
+  accuracyScore   Float    @map("accuracy_score")
+  transcribedText String?  @map("transcribed_text")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("speaking_histories")
+}
+
+model UserFlashcard {
+  id             String    @id @default(uuid())
+  userId         String
+  wordId         String
+  repetition     Int       @default(0)       // Số lần ôn liên tiếp đúng
+  interval       Int       @default(0)       // Khoảng cách ngày đến lần ôn tiếp
+  easinessFactor Float     @default(2.5)     // Hệ số EF (mặc định 2.5)
+  nextReviewDate DateTime  @default(now())   // Thời điểm cần ôn tiếp theo
+  lastReviewedAt DateTime?
+
+  @@unique([userId, wordId])
+}
+
+

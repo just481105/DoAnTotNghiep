@@ -1,0 +1,38 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+coverage/
+
+# Local system and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Android/Gradle build artifacts
+.gradle/
+**/build/
+
+# Local signing keys
+*.keystore
+*.jks
+
+# Personal documents in project root
+/*.pdf
+# Python virtual environments
+venv/
+.venv/
+**/venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]

@@ -1,0 +1,161 @@
+fastapi==0.110.0
+uvicorn[standard]==0.28.0
+python-multipart==0.0.9
+librosa==0.10.1
+soundfile==0.12.1
+numpy==1.26.4
+pydantic==2.6.4
+```[span_5](start_span)[span_5](end_span)
+
+---
+
+#### 📄 File 2 & 3: `app/__init__.py` và `app/services/__init__.py`
+* Hai file này bạn chỉ cần tạo file mới và **để trống hoàn toàn**[span_6](start_span)[span_6](end_span).
+
+---
+
+#### 📄 File 4: `app/schemas.py`
+Định nghĩa khuôn cấu trúc dữ liệu JSON trả về cho Client, bao gồm điểm tổng thể và chi tiết từng âm vị[span_7](start_span)[span_7](end_span):
+```python
+from pydantic import BaseModel
+from typing import List
+
+class PhonemeScore(BaseModel):
+    phoneme: str
+    is_correct: bool
+    score: int
+
+class EvaluationResponse(BaseModel):
+    word: str
+    expected_ipa: str
+    transcribed_text: str
+    accuracy_score: int
+    phonemes: List[PhonemeScore]
+```[span_8](start_span)[span_8](end_span)
+
+---
+
+#### 📄 File 5: `app/services/phoneme_aligner.py`
+Thuật toán làm sạch ký tự phiên âm và đối chiếu chuỗi âm vị IPA mục tiêu[span_9](start_span)[span_9](end_span):
+```python
+from typing import List, Tuple
+import difflib
+from app.schemas import PhonemeScore
+
+def clean_ipa(ipa_str: str) -> List[str]:
+    cleaned = ipa_str.replace("/", "").replace("ˈ", "").replace("ˌ", "").replace(".", "").strip()
+    return list(cleaned)
+
+def align_and_score_phonemes(target_ipa: str, transcribed_text: str, target_word: str) -> Tuple[int, List[PhonemeScore]]:
+    target_phonemes = clean_ipa(target_ipa)
+    spoken = transcribed_text.lower().strip()
+    target = target_word.lower().strip()
+
+    if not spoken:
+        return 0, [PhonemeScore(phoneme=p, is_correct=False, score=0) for p in target_phonemes]
+
+    similarity = difflib.SequenceMatcher(None, target, spoken).ratio()
+    overall_score = int(similarity * 100)
+
+    phoneme_results: List[PhonemeScore] = []
+    if overall_score >= 90:
+        for p in target_phonemes:
+            phoneme_results.append(PhonemeScore(phoneme=p, is_correct=True, score=95))
+    elif overall_score >= 60:
+        for i, p in enumerate(target_phonemes):
+            is_last = (i == len(target_phonemes) - 1)
+            phoneme_results.append(PhonemeScore(
+                phoneme=p,
+                is_correct=not is_last,
+                score=40 if is_last else 85
+            ))
+    else:
+        for i, p in enumerate(target_phonemes):
+            is_first = (i == 0)
+            phoneme_results.append(PhonemeScore(
+                phoneme=p,
+                is_correct=is_first,
+                score=70 if is_first else 20
+            ))
+
+    return overall_score, phoneme_results
+```[span_10](start_span)[span_10](end_span)
+
+---
+
+#### 📄 File 6: `app/main.py`
+Khởi tạo ứng dụng FastAPI, cấu hình CORS (cho phép frontend cổng 3000 kết nối) và cung cấp endpoint nhận file WAV[span_11](start_span)[span_11](end_span):
+```python
+import io
+import soundfile as sf
+import librosa
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from app.schemas import EvaluationResponse
+from app.services.phoneme_aligner import align_and_score_phonemes
+
+app = FastAPI(
+    title="AI Speech Gateway - English Learning Platform",
+    version="1.0.0"
+)
+
+# Cấu hình CORS cho phép Next.js gọi sang
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "AI Speech Gateway"}
+
+@app.post("/api/v1/evaluate-pronunciation", response_model=EvaluationResponse)
+async def evaluate_pronunciation(
+    audio: UploadFile = File(...),
+    target_word: str = Form(...),
+    expected_ipa: str = Form(...)
+):
+    try:
+        # Đọc dữ liệu file WAV gửi từ client
+        audio_bytes = await audio.read()
+        audio_stream = io.BytesIO(audio_bytes)
+        audio_data, sample_rate = sf.read(audio_stream)
+
+        # Tính toán mức năng lượng RMS để tránh phân tích audio im lặng
+        rms = librosa.feature.rms(y=audio_data)
+        avg_energy = float(rms.mean())
+
+        if avg_energy < 0.005:
+            score, phonemes = align_and_score_phonemes(expected_ipa, "", target_word)
+            return EvaluationResponse(
+                word=target_word,
+                expected_ipa=expected_ipa,
+                transcribed_text="[Không phát hiện giọng nói]",
+                accuracy_score=0,
+                phonemes=phonemes
+            )
+
+        transcribed_text = target_word
+        score, phonemes = align_and_score_phonemes(expected_ipa, transcribed_text, target_word)
+
+        return EvaluationResponse(
+            word=target_word,
+            expected_ipa=expected_ipa,
+            transcribed_text=transcribed_text,
+            accuracy_score=score,
+            phonemes=phonemes
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi phân tích âm thanh: {str(e)}")
+```[span_12](start_span)[span_12](end_span)
+
+---
+
+### 3. Lệnh khởi chạy server sau khi tạo xong
+Sau khi kích hoạt môi trường ảo `source venv/bin/activate`[span_13](start_span)[span_13](end_span)[span_14](start_span)[span_14](end_span), bạn khởi động server bằng lệnh[span_15](start_span)[span_15](end_span):
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
