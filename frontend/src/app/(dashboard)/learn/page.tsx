@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, Layers } from "lucide-react";
@@ -27,7 +27,7 @@ interface VocabCard {
 const DEMO_USER_ID = "e6de30ce-ac04-487f-b376-163240602f84";
 const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
 
-export default function LearnPage() {
+function LearnContent() {
   const searchParams = useSearchParams();
   const currentTopic = searchParams.get("topic");
 
@@ -263,5 +263,19 @@ export default function LearnPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LearnPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-semibold text-slate-500 dark:bg-slate-950">
+          Đang nạp bộ flashcard...
+        </div>
+      }
+    >
+      <LearnContent />
+    </Suspense>
   );
 }
