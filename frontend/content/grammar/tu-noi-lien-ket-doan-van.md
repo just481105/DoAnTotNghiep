@@ -1,0 +1,18 @@
+---
+title: Từ nối và liên kết trong đoạn văn
+order: 13
+grade: 12
+topic: Luyện thi
+summary: Lý thuyết, ví dụ và bài tập về từ nối và liên kết trong đoạn văn.
+published: false
+---
+
+> Bài này đang được soạn.
+
+## I. Từ nối và liên kết trong đoạn văn
+
+(Nội dung đang cập nhật)
+
+## II. Ví dụ
+
+## III. Bài tập nhanh

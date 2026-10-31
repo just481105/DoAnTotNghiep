@@ -45,7 +45,7 @@ export class GrammarService {
     const rows = await this.model
       .find(where)
       .select('-content')
-      .sort({ order: 1, createdAt: 1 })
+      .sort({ grade: 1, order: 1, createdAt: 1 })
       .lean();
 
     return rows.map((r: Record<string, any>) => this.toDto(r));

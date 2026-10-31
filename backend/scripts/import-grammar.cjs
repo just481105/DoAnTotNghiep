@@ -40,7 +40,7 @@ async function main() {
           topic: data.topic || null,
           summary: data.summary || null,
           content: content.trim(),
-          isPublished: true,
+          isPublished: String(data.published).toLowerCase() !== "false",
           updatedAt: now,
         },
         $setOnInsert: { slug, createdAt: now },

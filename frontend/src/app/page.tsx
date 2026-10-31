@@ -49,6 +49,7 @@ interface ExamItem {
   questions: number;
   done: boolean;
   attempts?: number;
+  href?: string;
   emoji: string;
   tone: string;
 }
@@ -102,7 +103,7 @@ const TOP_TOPICS = {
 };
 
 const MOCK_TESTS = [
-  { title: "Đề thi thử THPT", meta: "50 câu • 50 phút", tag: "Trọn bộ đề", free: true, featured: true, emoji: "🎓", tone: "from-amber-100 to-orange-100", href: "/exams" },
+  { title: "Đề thi thử THPT", meta: "40 câu • 50 phút", tag: "Trọn bộ đề", free: true, featured: true, emoji: "🎓", tone: "from-amber-100 to-orange-100", href: "/exams" },
   { title: "Ngữ pháp", meta: "20 câu • 15 phút", tag: "Theo chuyên đề", free: false, featured: false, emoji: "📝", tone: "from-emerald-100 to-teal-100", href: "/exams" },
   { title: "Từ vựng & Cụm từ", meta: "20 câu • 15 phút", tag: "Theo chuyên đề", free: false, featured: false, emoji: "🧠", tone: "from-sky-100 to-blue-100", href: "/learn" },
   { title: "Đọc hiểu", meta: "4 bài • 25 phút", tag: "Theo chuyên đề", free: false, featured: false, emoji: "📖", tone: "from-yellow-100 to-amber-100", href: "/exams" },
@@ -121,13 +122,13 @@ const SKILL_META: Record<Skill, { label: string; icon: LucideIcon }> = {
 
 const EXAMS: ExamItem[] = [
   { id: "1", title: "Từ vựng chủ đề Môi trường (Environment)", skill: "vocab", grade: 10, questions: 20, done: false, emoji: "🌿", tone: "from-emerald-100 to-lime-200" },
-  { id: "2", title: "Thì hiện tại hoàn thành & quá khứ đơn", skill: "grammar", grade: 10, questions: 15, done: false, emoji: "⏰", tone: "from-rose-100 to-pink-200" },
-  { id: "3", title: "Mệnh đề quan hệ — Bài tập tổng hợp", skill: "grammar", grade: 11, questions: 20, done: false, emoji: "🔗", tone: "from-yellow-100 to-amber-200" },
-  { id: "4", title: "Câu điều kiện loại 1, 2, 3", skill: "grammar", grade: 11, questions: 15, done: true, attempts: 2, emoji: "🎓", tone: "from-stone-100 to-orange-100" },
+  { id: "2", href: "/grammar/thi-hien-tai-hoan-thanh", title: "Thì hiện tại hoàn thành & quá khứ đơn", skill: "grammar", grade: 10, questions: 15, done: false, emoji: "⏰", tone: "from-rose-100 to-pink-200" },
+  { id: "3", href: "/grammar/menh-de-quan-he", title: "Mệnh đề quan hệ — Bài tập tổng hợp", skill: "grammar", grade: 11, questions: 20, done: false, emoji: "🔗", tone: "from-yellow-100 to-amber-200" },
+  { id: "4", href: "/grammar/cau-dieu-kien", title: "Câu điều kiện loại 1, 2, 3", skill: "grammar", grade: 11, questions: 15, done: true, attempts: 2, emoji: "🎓", tone: "from-stone-100 to-orange-100" },
   { id: "5", title: "Đọc hiểu: Education & Technology", skill: "reading", grade: 12, questions: 10, done: false, emoji: "📖", tone: "from-sky-100 to-blue-200" },
   { id: "6", title: "Nghe hiểu: Hội thoại đời sống hằng ngày", skill: "listening", grade: 10, questions: 8, done: false, emoji: "🎧", tone: "from-emerald-100 to-teal-200" },
   { id: "7", title: "Viết lại câu — Chuyển đổi câu", skill: "writing", grade: 12, questions: 15, done: false, emoji: "✍️", tone: "from-indigo-100 to-purple-200" },
-  { id: "8", title: "Đề thi thử tốt nghiệp THPT số 1", skill: "mock", grade: 12, questions: 50, done: true, attempts: 1, emoji: "🏆", tone: "from-amber-100 to-orange-200" },
+  { id: "8", title: "Đề thi thử tốt nghiệp THPT số 1", skill: "mock", grade: 12, questions: 40, done: true, attempts: 1, emoji: "🏆", tone: "from-amber-100 to-orange-200" },
 ];
 
 const STATUS_TABS = ["Tất cả", "Chưa làm", "Đã làm"] as const;
@@ -682,7 +683,7 @@ export default function DashboardPage() {
                 {pageItems.map((e) => (
                   <Link
                     key={e.id}
-                    href={`/exams/${e.id}`}
+                    href={e.href ?? `/exams/${e.id}`}
                     className={`${CARD} group flex flex-col p-3 transition hover:-translate-y-0.5 hover:shadow-md`}
                   >
                     <div className={`relative grid h-40 place-items-center rounded-2xl bg-linear-to-br ${e.tone}`}>
