@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getAllLessons, getLesson } from "@/lib/grammar";
+import { getLesson } from "@/lib/grammar";
 
 // Giao diện cho từng loại thẻ Markdown
 const md: Components = {
@@ -82,10 +81,6 @@ export default async function LessonPage({
   const lesson = await getLesson(slug);
   if (!lesson) notFound();
 
-  const all = await getAllLessons();
-  const idx = all.findIndex((l) => l.slug === slug);
-  const prev = idx > 0 ? all[idx - 1] : null;
-  const next = idx >= 0 && idx < all.length - 1 ? all[idx + 1] : null;
 
   return (
     <div className="min-h-screen bg-[#fbfbfd] pb-20 dark:bg-slate-950">
@@ -108,31 +103,6 @@ export default async function LessonPage({
             {lesson.content}
           </ReactMarkdown>
         </article>
-
-        <div className="mt-12 grid grid-cols-2 gap-4">
-          {prev ? (
-            <Link
-              href={`/grammar/${prev.slug}`}
-              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-            >
-              <ChevronLeft className="size-4 shrink-0" />
-              <span className="truncate">Bài {prev.order}: {prev.title}</span>
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next ? (
-            <Link
-              href={`/grammar/${next.slug}`}
-              className="flex items-center justify-end gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-            >
-              <span className="truncate">Bài {next.order}: {next.title}</span>
-              <ChevronRight className="size-4 shrink-0" />
-            </Link>
-          ) : (
-            <span />
-          )}
-        </div>
       </main>
     </div>
   );

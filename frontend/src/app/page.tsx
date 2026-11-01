@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -52,6 +52,8 @@ interface ExamItem {
   href?: string;
   emoji: string;
   tone: string;
+  order?: number;
+  topic?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -136,6 +138,21 @@ const GRADE_TABS = ["Tất cả", "Lớp 10", "Lớp 11", "Lớp 12"] as const;
 
 const PAGE_SIZE = 4;
 
+// Emoji + màu nền cho thẻ bài ngữ pháp, theo chuyên đề
+const GRAMMAR_STYLES: Record<string, { emoji: string; tone: string }> = {
+  "Câu": { emoji: "✍️", tone: "from-indigo-100 to-purple-200" },
+  "Thì": { emoji: "⏰", tone: "from-rose-100 to-pink-200" },
+  "Mệnh đề": { emoji: "🔗", tone: "from-yellow-100 to-amber-200" },
+  "Câu điều kiện": { emoji: "🎓", tone: "from-stone-100 to-orange-100" },
+  "Bị động": { emoji: "🔄", tone: "from-emerald-100 to-teal-200" },
+  "So sánh": { emoji: "⚖️", tone: "from-sky-100 to-blue-200" },
+  "Động từ": { emoji: "🏃", tone: "from-orange-100 to-amber-200" },
+  "Câu tường thuật": { emoji: "💬", tone: "from-fuchsia-100 to-pink-200" },
+  "Luyện thi": { emoji: "🏆", tone: "from-amber-100 to-orange-200" },
+  "Ôn tập": { emoji: "📚", tone: "from-slate-100 to-sky-200" },
+};
+const DEFAULT_GRAMMAR_STYLE = { emoji: "📘", tone: "from-sky-100 to-blue-200" };
+
 /* ------------------------------------------------------------------ */
 /*  HEATMAP (dữ liệu giả ổn định, TODO: thay bằng dữ liệu bài làm thật) */
 /* ------------------------------------------------------------------ */
@@ -190,6 +207,57 @@ export default function DashboardPage() {
   const [skill, setSkill] = useState<Skill | "all">("all");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [grammarLessons, setGrammarLessons] = useState<ExamItem[]>([]);
+
+  // Lấy bài ngữ pháp thật từ backend (MongoDB)
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/grammar")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(
+        (
+          rows: Array<{
+            slug: string;
+            title: string;
+            order: number;
+            grade: number | null;
+            topic: string | null;
+          }>,
+        ) => {
+          if (cancelled || !Array.isArray(rows)) return;
+          setGrammarLessons(
+            rows
+              .filter((l) => l.grade === 10 || l.grade === 11 || l.grade === 12)
+              .map((l) => {
+                const style = GRAMMAR_STYLES[l.topic ?? ""] ?? DEFAULT_GRAMMAR_STYLE;
+                return {
+                  id: l.slug,
+                  title: l.title,
+                  skill: "grammar" as const,
+                  grade: l.grade as Grade,
+                  questions: 0,
+                  done: false,
+                  emoji: style.emoji,
+                  tone: style.tone,
+                  order: l.order,
+                  topic: l.topic,
+                  href: `/grammar/${l.slug}`,
+                };
+              }),
+          );
+        },
+      )
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Bài ngữ pháp mẫu được thay bằng bài thật từ API
+  const allItems = useMemo(
+    () => [...EXAMS.filter((e) => e.skill !== "grammar"), ...grammarLessons],
+    [grammarLessons],
+  );
 
   const daysLeft = useMemo(() => {
     const now = new Date();
@@ -199,7 +267,7 @@ export default function DashboardPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return EXAMS.filter((e) => {
+    return allItems.filter((e) => {
       if (statusTab === "Chưa làm" && e.done) return false;
       if (statusTab === "Đã làm" && !e.done) return false;
       if (gradeTab !== "Tất cả" && `Lớp ${e.grade}` !== gradeTab) return false;
@@ -207,13 +275,13 @@ export default function DashboardPage() {
       if (q && !e.title.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [statusTab, gradeTab, skill, query]);
+  }, [allItems, statusTab, gradeTab, skill, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const skillCount = (s: Skill) => EXAMS.filter((e) => e.skill === s).length;
+  const skillCount = (s: Skill) => allItems.filter((e) => e.skill === s).length;
   const resetPage = () => setPage(1);
   const MainTopicIcon = TOP_TOPICS.main.icon;
 
@@ -635,7 +703,7 @@ export default function DashboardPage() {
                       : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}
                 >
-                  {EXAMS.length} bài
+                  {allItems.length} bài
                 </span>
               </button>
 
@@ -672,7 +740,12 @@ export default function DashboardPage() {
                 Kho bài tập: <b className={HEADING}>{filtered.length} bài</b> sẵn có
               </p>
               <span className="text-slate-400">
-                Trang {currentPage}/{totalPages}
+                {skill === "grammar" && (
+                <Link href="/grammar" className="mr-3 font-bold text-blue-600 hover:underline dark:text-blue-400">
+                  Xem tất cả ➜
+                </Link>
+              )}
+              Trang {currentPage}/{totalPages}
               </span>
             </div>
 
@@ -713,15 +786,15 @@ export default function DashboardPage() {
                     <div className="mt-auto flex items-center justify-between border-t border-slate-100 px-1 pt-3 dark:border-slate-800">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          e.questions > 1
+                          (e.questions > 1 || e.skill === "grammar")
                             ? "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
                             : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
                         }`}
                       >
-                        {e.questions} câu hỏi
+                        {e.skill === "grammar" ? `Bài ${e.order}` : `${e.questions} câu hỏi`}
                       </span>
                       <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                        {SKILL_META[e.skill].label}
+                        {e.topic ?? SKILL_META[e.skill].label}
                       </span>
                     </div>
                   </Link>
