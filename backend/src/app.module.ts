@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { Sm2Module } from './sm2/sm2.module';
 import { UsersModule } from './users/users.module';
 import { ExamModule } from './exam/exam.module';
+import { GrammarModule } from './grammar/grammar.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ExamModule } from './exam/exam.module';
     Sm2Module,
     UsersModule,
     ExamModule,
+    GrammarModule,
   ],
 })
 export class AppModule {}

@@ -29,9 +29,19 @@ function parseHeader(raw: string): { data: Record<string, string>; body: string 
   return { data, body: m[2] };
 }
 
-function readLesson(file: string): (Lesson & { published: boolean }) | null {
-  const slug = file.replace(/\.md$/, "");
-  const raw = fs.readFileSync(path.join(DIR, file), "utf8");
+// Quét tất cả file .md, kể cả trong thư mục con (grade-10, grade-11, grade-12)
+function listMarkdownFiles(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return listMarkdownFiles(full);
+    return entry.name.endsWith(".md") ? [full] : [];
+  });
+}
+
+// Nhận đường dẫn đầy đủ của file
+function readLesson(filePath: string): (Lesson & { published: boolean }) | null {
+  const slug = path.basename(filePath, ".md");
+  const raw = fs.readFileSync(filePath, "utf8");
   const { data, body } = parseHeader(raw);
   return {
     slug,
@@ -49,9 +59,7 @@ function readLesson(file: string): (Lesson & { published: boolean }) | null {
 // Danh sách bài đã công khai, sắp xếp theo lớp rồi theo số bài
 export async function getAllLessons(): Promise<LessonMeta[]> {
   if (!fs.existsSync(DIR)) return [];
-  return fs
-    .readdirSync(DIR)
-    .filter((f) => f.endsWith(".md"))
+  return listMarkdownFiles(DIR)
     .map(readLesson)
     .filter((l): l is Lesson & { published: boolean } => !!l && l.published)
     .sort((a, b) => (a.grade ?? 0) - (b.grade ?? 0) || a.order - b.order)
@@ -68,9 +76,13 @@ export async function getAllLessons(): Promise<LessonMeta[]> {
 export async function getLesson(slug: string): Promise<Lesson | null> {
   // chặn ký tự lạ để không đọc được file ngoài thư mục content
   if (!/^[a-z0-9-]+$/i.test(slug)) return null;
-  const file = `${slug}.md`;
-  if (!fs.existsSync(path.join(DIR, file))) return null;
-  const lesson = readLesson(file);
+  if (!fs.existsSync(DIR)) return null;
+  // tìm file có tên trùng slug ở bất kỳ thư mục con nào
+  const filePath = listMarkdownFiles(DIR).find(
+    (f) => path.basename(f, ".md") === slug
+  );
+  if (!filePath) return null;
+  const lesson = readLesson(filePath);
   if (!lesson || !lesson.published) return null;
   const { published: _published, ...rest } = lesson;
   void _published;

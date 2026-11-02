@@ -119,5 +119,47 @@ I wish I could see you next week
 
 ### Ví dụ:
 
-I wish you wouldn’t keep interrupting me
-(*Tôi ước rằng bạn đã không ngắt lời tôi*)
+I wish you wouldn’t keep interrupting me  
+(*Tôi ước rằng bạn không ngắt lời tôi*)
+
+### Cấu trúc If only
+> - If only + (that) + chủ ngữ + would/ could + động từ nguyên mẫu
+
+### Ví dụ:
+
+If only tomorrow will be fine (Giá như ngày mai sẽ ổn)
+
+
+## Bài tập
+
+### Cho dạng đúng của động từ trong ngoặc:
+
+1. It was a stupid thing to say. I wish ............... it (I/ not/ say)
+2. I'm fed up with this rain. I wish ............... (it / stop)
+3. It's a difficult question. I wish ............... the answer. (I / know)
+4. I should have listened to you. I wish ............... your advice. (I / take)
+5. You're lucky to be going away. I wish ............... with you. (I / can / come)
+6. I have no energy at the moment. I wish ............... so tired. (I / not / be)
+7. Aren't they ready yet? I wish ............... . (they / hurry up)
+8. It would be nice to stay here longer. I wish ............... to go now (we / not / have)
+9. When we were in London last year, we didn't have time to see all the things we wanted to see. I wish ............... longer. (we / can / stay)
+10. It's freezing today. I wish ............... so cold. I hate cold weather. (it / not / be)
+11. Joe still doesn't know what he wants to do. I wish ............... . (he / decide)
+12. I really didn't enjoy the party. I wish ............... . (we / not / go)
+
+### Đáp án
+
+| Câu | Đáp án | Giải thích |
+| --- | ------ | ---------- |
+| 1 | I hadn't said | Hối tiếc về việc đã nói điều ngu ngốc trong quá khứ → câu ước ở quá khứ (wish + had + V3) |
+| 2 | it would stop | Chán vì trời mưa, mong trời ngừng mưa → câu ước ở tương lai (wish + would + V) |
+| 3 | I knew | Hối tiếc vì không biết đáp án ở hiện tại → câu ước ở hiện tại (wish + V2/ed) |
+| 4 | I had taken | Lẽ ra nên nghe lời khuyên, hối tiếc về việc đã xảy ra → câu ước ở quá khứ (wish + had + V3) |
+| 5 | I could come | Tiếc vì không thể đi cùng ở hiện tại → câu ước ở hiện tại (wish + could + V) |
+| 6 | I weren't (I were not) | Hiện tại không có năng lượng, ước không mệt → câu ước ở hiện tại (wish + were/V2) |
+| 7 | they would hurry up | Họ vẫn chưa chuẩn bị xong, mong họ nhanh hơn → câu ước ở tương lai (wish + would + V) |
+| 8 | we didn't have | Ước không phải đi bây giờ, không đúng với thực tế hiện tại → câu ước ở hiện tại (wish + V2/ed) |
+| 9 | we could have stayed | Tiếc vì năm ngoái không đủ thời gian ở London → câu ước ở quá khứ (wish + could have + V3) |
+| 10 | it weren't (it were not) | Hôm nay trời rất lạnh, ước không lạnh → câu ước ở hiện tại (wish + were/V2) |
+| 11 | he would decide | Joe vẫn chưa biết làm gì, mong anh ấy quyết định được → câu ước ở tương lai (wish + would + V) |
+| 12 | we hadn't gone | Không thích buổi tiệc, hối tiếc đã đến → câu ước ở quá khứ (wish + had + V3) |
