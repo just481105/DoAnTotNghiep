@@ -1,30 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { fetchWithAuth } from "@/services/api-client";
+
+interface DashboardResponse {
+  stats: {
+    totalSubmissions: number;
+    activeLearners: number;
+    b1Completed: number;
+    b2Completed: number;
+    dueTodayCount: number;
+  };
+  topRankings: Array<{
+    id: string;
+    name: string;
+    xp: number;
+    rank: number;
+    avatar: string;
+  }>;
+  retentionCurve: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
+  user: {
+    id: string;
+    fullName: string | null;
+    email: string;
+    streakDays: number;
+    xpPoints: number;
+    cefrLevel: string;
+  } | null;
+}
 
 export function useDashboardData() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        setLoading(true);
-        const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
-        const res = await fetch(`${BACKEND_URL}/users/me/dashboard-stats?userId=e6de30ce-ac04-487f-b376-163240602f84`);
+    let active = true;
+    fetchWithAuth<DashboardResponse>("/users/me/dashboard-stats")
+      .then((result) => {
+        if (active) setData(result);
+      })
+      .catch((error: unknown) => {
+        console.warn("Không thể tải thống kê học tập:", error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-        if (res.ok) {
-          const result = await res.json();
-          setData(result);
-        }
-      } catch (err) {
-        console.warn("Không kết nối được NestJS Core API, sử dụng dữ liệu mặc định:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchStats();
+    return () => {
+      active = false;
+    };
   }, []);
 
   return { 

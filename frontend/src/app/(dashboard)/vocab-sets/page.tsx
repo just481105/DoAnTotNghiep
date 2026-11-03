@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Sparkles, ChevronRight, Plus, Flame } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { fetchWithAuth } from "@/services/api-client";
 
 interface VocabTopic {
   id: string;
@@ -85,12 +86,9 @@ export default function VocabSetsPage() {
   useEffect(() => {
     async function fetchTopics() {
       try {
-        const res = await fetch("http://localhost:5001/sm2/topics");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setTopics(data);
-          }
+        const data = await fetchWithAuth("/sm2/topics");
+        if (Array.isArray(data) && data.length > 0) {
+          setTopics(data);
         }
       } catch (err) {
         console.warn("Dùng danh sách tag mẫu:", err);

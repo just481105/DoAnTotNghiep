@@ -1,4 +1,7 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
 import { FlashcardsService } from './flashcards.service';
 
 @Controller('flashcards')
@@ -6,16 +9,17 @@ export class FlashcardsController {
   constructor(private readonly flashcardsService: FlashcardsService) {}
 
   @Post('review')
+  @UseGuards(JwtAuthGuard)
   async reviewCard(
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
-      userId: string;
       wordId: string;
       rating: 'again' | 'hard' | 'good' | 'easy';
     },
   ) {
     return this.flashcardsService.reviewCard(
-      body.userId,
+      user.sub,
       body.wordId,
       body.rating,
     );

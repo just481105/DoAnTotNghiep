@@ -27,7 +27,6 @@ export default function TestFlashcardPage() {
 
       <FlashcardReview
         card={DUMMY_CARDS[index]}
-        userId="user-test-1"
         onNext={handleNext}
       />
     </div>

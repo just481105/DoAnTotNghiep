@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
 import { Sm2Module } from './sm2/sm2.module';
 import { UsersModule } from './users/users.module';
 import { ExamModule } from './exam/exam.module';
@@ -21,6 +22,7 @@ import { GrammarModule } from './grammar/grammar.module';
     }),
     // PostgreSQL (Prisma): người dùng, đề thi, SM-2...
     PrismaModule,
+    AuthModule,
     Sm2Module,
     UsersModule,
     ExamModule,

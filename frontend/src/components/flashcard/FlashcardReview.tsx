@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithAuth } from "@/services/api-client";
 
 type Rating = "again" | "hard" | "good" | "easy";
 
@@ -12,30 +13,32 @@ interface FlashcardProps {
     meaning: string;
     example?: string;
   };
-  userId: string;
   onNext: () => void;
 }
 
-export default function FlashcardReview({ card, userId, onNext }: FlashcardProps) {
+interface ReviewResult {
+  repetition: number;
+  interval: number;
+  easinessFactor: number;
+  nextReviewDate: string;
+}
+
+export default function FlashcardReview({ card, onNext }: FlashcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [lastResult, setLastResult] = useState<any>(null);
+  const [lastResult, setLastResult] = useState<ReviewResult | null>(null);
 
   const handleReview = async (rating: Rating) => {
     setLoading(true);
     try {
-      // Đổi 3001 thành đúng cổng của NestJS backend đang chạy
-      const res = await fetch("http://localhost:3001/flashcards/review", {
+      const data = await fetchWithAuth<ReviewResult>("/flashcards/review", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: userId,
           wordId: card.id,
           rating: rating,
         }),
       });
 
-      const data = await res.json();
       setLastResult(data);
       setIsFlipped(false);
       onNext();
@@ -64,7 +67,11 @@ export default function FlashcardReview({ card, userId, onNext }: FlashcardProps
         ) : (
           <div className="space-y-2">
             <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{card.meaning}</h3>
-            {card.example && <p className="text-xs text-slate-500 italic">"{card.example}"</p>}
+            {card.example && (
+              <p className="text-xs text-slate-500 italic">
+                &quot;{card.example}&quot;
+              </p>
+            )}
           </div>
         )}
       </div>

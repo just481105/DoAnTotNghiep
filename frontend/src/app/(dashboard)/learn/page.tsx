@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { fetchWithAuth } from "@/services/api-client";
 
 interface VocabCard {
   id: string;
@@ -24,9 +25,6 @@ interface VocabCard {
   easinessFactor: number;
 }
 
-const DEMO_USER_ID = "e6de30ce-ac04-487f-b376-163240602f84";
-const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
-
 function LearnContent() {
   const searchParams = useSearchParams();
   const currentTopic = searchParams.get("topic");
@@ -41,10 +39,12 @@ function LearnContent() {
   const loadCards = useCallback(async () => {
     setIsLoading(true);
     try {
-      const topicQuery = currentTopic ? `&topic=${encodeURIComponent(currentTopic)}` : "";
-      const res = await fetch(`${BACKEND_URL}/sm2/words?userId=${DEMO_USER_ID}${topicQuery}`);
-      if (!res.ok) throw new Error("Lỗi tải từ vựng");
-      const data = await res.json();
+      const topicQuery = currentTopic
+        ? `?topic=${encodeURIComponent(currentTopic)}`
+        : "";
+      const data = await fetchWithAuth<VocabCard[]>(
+        `/sm2/words${topicQuery}`,
+      );
       setCards(data);
       setCurrentIndex(0);
       setIsFlipped(false);
@@ -77,11 +77,9 @@ function LearnContent() {
 
     const currentCard = cards[currentIndex];
     try {
-      await fetch(`${BACKEND_URL}/sm2/grade`, {
+      await fetchWithAuth("/sm2/grade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: DEMO_USER_ID,
           vocabularyId: currentCard.id,
           quality: grade,
         }),

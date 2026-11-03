@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Clock, ArrowLeft, CheckCircle2, XCircle, AlertCircle, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { fetchWithAuth } from "@/services/api-client";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
-const STUDENT_USER_ID = "e6de30ce-ac04-487f-b376-163240602f84";
 
 interface QuestionOption {
   id: string;
@@ -79,6 +79,26 @@ export default function ExamTakingPage() {
     fetchExam();
   }, [examId]);
 
+  // 3. Gửi bài làm sang NestJS để chấm điểm và lưu vào CSDL
+  const handleSubmitExam = useCallback(async () => {
+    if (isSubmitting || result || !examId) return;
+    setIsSubmitting(true);
+    try {
+      const data = await fetchWithAuth<ExamResult>(`/exams/${examId}/submit`, {
+        method: "POST",
+        body: JSON.stringify({
+          answers: selectedAnswers,
+        }),
+      });
+
+      setResult(data);
+    } catch (err) {
+      console.error("Lỗi gửi bài thi:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [examId, isSubmitting, result, selectedAnswers]);
+
   // 2. Đồng hồ đếm ngược thời gian
   useEffect(() => {
     if (timeLeft <= 0 || result) return;
@@ -86,39 +106,14 @@ export default function ExamTakingPage() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmitExam();
+          void handleSubmitExam();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, result]);
-
-  // 3. Gửi bài làm sang NestJS để chấm điểm và lưu vào CSDL
-  const handleSubmitExam = async () => {
-    if (isSubmitting || result || !examId) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/exams/${examId}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: STUDENT_USER_ID,
-          answers: selectedAnswers,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setResult(data);
-      }
-    } catch (err) {
-      console.error("Lỗi gửi bài thi:", err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [timeLeft, result, handleSubmitExam]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

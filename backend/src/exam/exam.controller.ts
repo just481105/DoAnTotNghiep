@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
 import { ExamService } from './exam.service';
 
 @Controller('exams')
@@ -16,12 +26,12 @@ export class ExamController {
   }
 
   @Post(':id/submit')
+  @UseGuards(JwtAuthGuard)
   async submitExam(
     @Param('id') examId: string,
-    @Body() body: { userId?: string; answers: Record<string, string> },
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { answers: Record<string, string> },
   ) {
-    // Sử dụng ID chuẩn của tài khoản sinh viên Bùi Đức Nam
-    const targetUserId = body.userId || 'e6de30ce-ac04-487f-b376-163240602f84';
-    return this.examService.submitExam(targetUserId, examId, body.answers || {});
+    return this.examService.submitExam(user.sub, examId, body.answers || {});
   }
 }

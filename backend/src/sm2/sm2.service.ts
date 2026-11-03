@@ -90,8 +90,8 @@ async getAllVocabularies() {
 }
 
 
-  async processReview(dto: ReviewGradeDto) {
-    const { userId, vocabularyId, quality } = dto;
+  async processReview(userId: string, dto: ReviewGradeDto) {
+    const { vocabularyId, quality } = dto;
 
     // Tìm trạng thái học của từ vựng này trong DB
     let stat = await this.prisma.userSm2Stats.findUnique({
@@ -140,11 +140,11 @@ async getAllVocabularies() {
     });
   }
 
-async getVocabularyTopics(userId?: string) {
+async getVocabularyTopics(userId: string) {
   // Lấy toàn bộ từ vựng kèm trạng thái SM-2 của học viên
   const vocabularies = await this.prisma.vocabulary.findMany({
     include: {
-      sm2Stats: userId ? { where: { userId } } : false,
+      sm2Stats: { where: { userId } },
     },
   });
 

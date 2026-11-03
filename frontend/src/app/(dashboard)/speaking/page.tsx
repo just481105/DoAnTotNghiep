@@ -6,12 +6,10 @@ import { Mic, Square, Loader2, Volume2, ArrowRight, Sparkles } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SpeechEvaluationResult } from "@/types";
+import { fetchWithAuth } from "@/services/api-client";
 
 const AI_GATEWAY_URL =
   process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8000";
-const CORE_API_URL =
-  process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
-
 interface TargetWordItem {
   id?: string;
   word: string;
@@ -19,6 +17,20 @@ interface TargetWordItem {
   cefr: string;
   ipa: string;
   meaning: string;
+}
+
+interface VocabularyLookup {
+  id: string;
+  word: string;
+  pos: string;
+  cefrLevel: string;
+  ipa: string;
+  meaningVi: string;
+  meaningEn?: string;
+}
+
+interface SpeakingHistoryResponse {
+  earnedXp: number;
 }
 
 const DEFAULT_TARGET_WORDS: TargetWordItem[] = [
@@ -111,11 +123,10 @@ function SpeakingContent() {
         return;
       }
 
-      const res = await fetch(`${CORE_API_URL}/sm2/words`);
-      if (res.ok) {
-        const words = await res.json();
+      const words = await fetchWithAuth<VocabularyLookup[]>("/sm2/words");
+      if (Array.isArray(words)) {
         const matched = words.find(
-          (w: any) => w.word.toLowerCase() === queryWord.toLowerCase()
+          (w) => w.word.toLowerCase() === queryWord.toLowerCase()
         );
 
         if (matched) {
@@ -278,21 +289,18 @@ function SpeakingContent() {
 
       // 2. Gửi kết quả về NestJS Core để lưu lịch sử và nhận điểm XP
       try {
-        const nestRes = await fetch(`${CORE_API_URL}/users/me/speaking-history`, {
+        const nestData = await fetchWithAuth<SpeakingHistoryResponse>(
+          "/users/me/speaking-history",
+          {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId: "e6de30ce-ac04-487f-b376-163240602f84",
             word: currentTarget.word,
             accuracyScore: data.accuracy_score,
             transcribedText: data.transcribed_text,
           }),
-        });
-
-        if (nestRes.ok) {
-          const nestData = await nestRes.json();
-          setXpEarned(nestData.earnedXp || 10);
-        }
+          },
+        );
+        setXpEarned(nestData.earnedXp || 10);
       } catch (dbErr) {
         console.warn("Không thể lưu kết quả phát âm vào NestJS:", dbErr);
       }

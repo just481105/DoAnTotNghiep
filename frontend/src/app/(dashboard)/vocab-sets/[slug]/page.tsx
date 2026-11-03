@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Volume2, ArrowLeft, Layers, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { fetchWithAuth } from "@/services/api-client";
 
 interface VocabItem {
   id?: string;
@@ -18,8 +19,6 @@ interface VocabItem {
   exampleEn: string;
   exampleVi?: string;
 }
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
 
 export default function TopicDetailPage() {
   const params = useParams();
@@ -36,10 +35,10 @@ export default function TopicDetailPage() {
     async function loadTopicWords() {
       setIsLoading(true);
       try {
-        const res = await fetch(`${BACKEND_URL}/sm2/words?topic=${encodeURIComponent(topicName)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+        const data = await fetchWithAuth(
+          `/sm2/words?topic=${encodeURIComponent(topicName)}`,
+        );
+        if (Array.isArray(data) && data.length > 0) {
             const formatted: VocabItem[] = data.map((item: any, idx: number) => ({
               id: item.id,
               order: idx + 1,
@@ -53,7 +52,6 @@ export default function TopicDetailPage() {
             }));
             setVocabList(formatted);
             return;
-          }
         }
       } catch (err) {
         console.warn("Không kết nối được backend, nạp danh sách dự phòng:", err);

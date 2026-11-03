@@ -31,6 +31,31 @@
 $ pnpm install
 ```
 
+## Authentication
+
+The API uses `POST /auth/register` and `POST /auth/login`. Both return a
+one-hour JWT access token. Before starting the backend, set `JWT_ACCESS_SECRET`
+in `backend/.env` to a unique random value (do not commit it):
+
+```bash
+openssl rand -base64 32
+```
+
+Copy the generated value into `backend/.env`:
+
+```env
+JWT_ACCESS_SECRET=your-generated-value
+```
+
+New accounts can be created at `/register`. The seeded sample user uses a
+placeholder password hash and cannot be used to log in; create a new account
+through the registration page instead.
+
+User-specific endpoints derive the account ID from the authenticated JWT.
+Send the access token returned by login or registration in the
+`Authorization: Bearer <access_token>` header; do not send a `userId` in the
+request body or query string.
+
 ## Compile and run the project
 
 ```bash

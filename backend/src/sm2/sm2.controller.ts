@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Query, ValidationPipe } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+  ValidationPipe,
+} from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
 import { Sm2Service } from './sm2.service';
 import { ReviewGradeDto } from './dto/create-sm2.dto';
 
@@ -7,13 +18,18 @@ export class Sm2Controller {
   constructor(private readonly sm2Service: Sm2Service) {}
 
   @Get('due-today')
-  getDueWords(@Query('userId') userId: string) {
-    return this.sm2Service.getDueWords(userId);
+  @UseGuards(JwtAuthGuard)
+  getDueWords(@CurrentUser() user: AuthenticatedUser) {
+    return this.sm2Service.getDueWords(user.sub);
   }
 
   @Post('grade')
-  processReview(@Body(new ValidationPipe()) dto: ReviewGradeDto) {
-    return this.sm2Service.processReview(dto);
+  @UseGuards(JwtAuthGuard)
+  processReview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ValidationPipe()) dto: ReviewGradeDto,
+  ) {
+    return this.sm2Service.processReview(user.sub, dto);
   }
 
   @Get('vocabularies')
@@ -22,20 +38,20 @@ async getAllVocabularies() {
 }
 
 @Get('topics')
-async getTopics(@Query('userId') userId?: string) {
-  return this.sm2Service.getVocabularyTopics(userId || 'e6de30ce-ac04-487f-b376-163240602f84');
+@UseGuards(JwtAuthGuard)
+async getTopics(@CurrentUser() user: AuthenticatedUser) {
+  return this.sm2Service.getVocabularyTopics(user.sub);
 }
 
 @Get('words')
+@UseGuards(JwtAuthGuard)
 async getWordsByTopic(
-  @Query('userId') userId: string,
+  @CurrentUser() user: AuthenticatedUser,
   @Query('topic') topic?: string,
 ) {
-  const targetUserId = userId || 'e6de30ce-ac04-487f-b376-163240602f84';
-  return this.sm2Service.getWordsByTopic(targetUserId, topic);
+  return this.sm2Service.getWordsByTopic(user.sub, topic);
 }
 
 
 
 }
-
