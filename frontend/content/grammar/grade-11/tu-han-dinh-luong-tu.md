@@ -4,7 +4,7 @@ order: 19
 grade: 11
 topic: Từ hạn định
 summary: Lý thuyết, ví dụ và bài tập về từ hạn định: each, every, both, either, neither, all, none.
-published: false
+published: true 
 ---
 
 > Bài này đang được soạn.

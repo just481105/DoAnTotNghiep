@@ -4,7 +4,7 @@ order: 12
 grade: 11
 topic: Câu tường thuật
 summary: "Lý thuyết, ví dụ và bài tập về câu tường thuật: câu trần thuật."
-published: false
+published: true 
 ---
 
 > Bài này đang được soạn.
