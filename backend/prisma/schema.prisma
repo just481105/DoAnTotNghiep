@@ -7,9 +7,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// -------------------------------------------------------------
-// 1. PHÂN QUYỀN VÀ NGƯỜI DÙNG (USERS & AUTHENTICATION)
-// -------------------------------------------------------------
 enum Role {
   STUDENT
   CONTENT_ADMIN
@@ -17,16 +14,17 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  fullName     String?  @map("full_name")
-  avatarUrl    String?  @map("avatar_url")
-  role         Role     @default(STUDENT)
-  streakDays   Int      @default(0) @map("streak_days")
-  xpPoints     Int      @default(0) @map("xp_points")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String            @id @default(uuid())
+  email           String            @unique
+  passwordHash    String            @map("password_hash")
+  fullName        String?           @map("full_name")
+  avatarUrl       String?           @map("avatar_url")
+  role            Role              @default(STUDENT)
+  streakDays      Int               @default(0) @map("streak_days")
+  xpPoints        Int               @default(0) @map("xp_points")
+  lastStudiedAt   DateTime?         @map("last_studied_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
 
   sm2Stats        UserSm2Stats[]
   examAttempts    UserExamAttempt[]
@@ -35,50 +33,47 @@ model User {
   @@map("users")
 }
 
-// -------------------------------------------------------------
-// 2. KHO TỪ VỰNG & THUẬT TOÁN SM-2 (VOCABULARY & SPACED REPETITION)
-// -------------------------------------------------------------
 model Vocabulary {
-  id        String   @id @default(uuid())
-  word      String   @unique
-  pos       String // noun, verb, adj...
-  cefrLevel String   @map("cefr_level") // A1, A2, B1, B2, C1, C2
-  ipa       String
-  meaningVi String   @map("meaning_vi")
-  meaningEn String?  @map("meaning_en")
-  exampleEn String   @map("example_en")
-  exampleVi String?  @map("example_vi")
-  audioUrl  String?  @map("audio_url")
-  topic     String   @default("Tổng quát")
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String            @id @default(uuid())
+  word         String            @unique
+  pos          String
+  cefrLevel    String            @map("cefr_level")
+  ipa          String
+  meaningVi    String            @map("meaning_vi")
+  meaningEn    String?           @map("meaning_en")
+  exampleEn    String            @map("example_en")
+  exampleVi    String?           @map("example_vi")
+  collocations String[]          @default([])
+  audioUrl     String?           @map("audio_url")
+  topic        String            @default("Tổng quát")
+  createdAt    DateTime          @default(now()) @map("created_at")
 
-  sm2Stats UserSm2Stats[]
+  sm2Stats     UserSm2Stats[]
+  speaking     SpeakingHistory[]
 
   @@index([topic])
   @@map("vocabularies")
 }
 
 model UserSm2Stats {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  vocabularyId   String   @map("vocabulary_id")
-  repetitions    Int      @default(0)
-  intervalDays   Int      @default(0) @map("interval_days")
-  easinessFactor Float    @default(2.5) @map("easiness_factor")
-  nextReviewAt   DateTime @default(now()) @map("next_review_at")
-  lastQuality    Int      @default(0) @map("last_quality") // 0 - 5
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id             String     @id @default(uuid())
+  userId         String     @map("user_id")
+  vocabularyId   String     @map("vocabulary_id")
+  repetitions    Int        @default(0)
+  intervalDays   Int        @default(0) @map("interval_days")
+  easinessFactor Float      @default(2.5) @map("easiness_factor")
+  nextReviewAt   DateTime   @default(now()) @map("next_review_at")
+  lastQuality    Int        @default(0) @map("last_quality")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary     Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, vocabularyId])
+  @@index([userId, nextReviewAt])
   @@map("user_sm2_stats")
 }
 
-// -------------------------------------------------------------
-// 3. NGÂN HÀNG ĐỀ THI & CÂU HỎI TRẮC NGHIỆM (EXAMS & QUESTIONS)
-// -------------------------------------------------------------
 enum ExamType {
   VSTEP
   CEFR
@@ -89,93 +84,102 @@ enum ExamType {
 enum SkillType {
   LISTENING
   READING
-  WRITING
-  SPEAKING
 }
 
 model Exam {
-  id          String   @id @default(uuid())
+  id          String            @id @default(uuid())
   title       String
   description String?
-  examType    ExamType @default(VSTEP) @map("exam_type")
-  durationMin Int      @default(60) @map("duration_minutes")
-  totalMarks  Int      @default(100) @map("total_marks")
-  isPublished Boolean  @default(false) @map("is_published")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  examType    ExamType          @default(VSTEP) @map("exam_type")
+  durationMin Int               @default(60) @map("duration_minutes")
+  totalMarks  Int               @default(100) @map("total_marks")
+  isPublished Boolean           @default(false) @map("is_published")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
-  questions Question[]
-  attempts  UserExamAttempt[]
+  questions   Question[]
+  attempts    UserExamAttempt[]
 
   @@map("exams")
 }
 
 model Question {
-  id          String    @id @default(uuid())
-  examId      String    @map("exam_id")
-  skillType   SkillType @default(READING) @map("skill_type")
-  passageText String?   @map("passage_text") // Đoạn văn đọc hiểu hoặc ngữ cảnh
-  audioUrl    String?   @map("audio_url") // File nghe Audio nếu là Listening
-  prompt      String // Nội dung câu hỏi
-  explanation String? // Giải thích đáp án chi tiết
-  orderIndex  Int       @default(0) @map("order_index")
+  id          String           @id @default(uuid())
+  examId      String           @map("exam_id")
+  skillType   SkillType        @default(READING) @map("skill_type")
+  passageText String?          @map("passage_text")
+  audioUrl    String?          @map("audio_url")
+  prompt      String
+  explanation String?
+  orderIndex  Int              @default(0) @map("order_index")
 
-  exam    Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
-  options QuestionOption[]
+  exam        Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  options     QuestionOption[]
+  answers     UserAnswer[]
 
+  @@index([examId, orderIndex])
   @@map("questions")
 }
 
 model QuestionOption {
-  id          String  @id @default(uuid())
-  questionId  String  @map("question_id")
-  optionLabel String  @map("option_label") // 'A', 'B', 'C', 'D'
-  content     String // Nội dung phương án
-  isCorrect   Boolean @default(false) @map("is_correct")
+  id          String       @id @default(uuid())
+  questionId  String       @map("question_id")
+  optionLabel String       @map("option_label")
+  content     String
+  isCorrect   Boolean      @default(false) @map("is_correct")
 
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedBy  UserAnswer[]
 
+  @@unique([questionId, optionLabel])
   @@map("question_options")
 }
 
 model UserExamAttempt {
-  id           String    @id @default(uuid())
-  userId       String    @map("user_id")
-  examId       String    @map("exam_id")
-  score        Float     @default(0)
-  totalCorrect Int       @default(0) @map("total_correct")
-  startedAt    DateTime  @default(now()) @map("started_at")
-  completedAt  DateTime? @map("completed_at")
+  id           String       @id @default(uuid())
+  userId       String       @map("user_id")
+  examId       String       @map("exam_id")
+  score        Float        @default(0)
+  totalCorrect Int          @default(0) @map("total_correct")
+  startedAt    DateTime     @default(now()) @map("started_at")
+  completedAt  DateTime?    @map("completed_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam         Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers      UserAnswer[]
 
+  @@index([userId, examId])
   @@map("user_exam_attempts")
 }
 
-model SpeakingHistory {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  word            String
-  accuracyScore   Float    @map("accuracy_score")
-  transcribedText String?  @map("transcribed_text")
-  createdAt       DateTime @default(now()) @map("created_at")
+model UserAnswer {
+  id               String          @id @default(uuid())
+  attemptId        String          @map("attempt_id")
+  questionId       String          @map("question_id")
+  selectedOptionId String?         @map("selected_option_id")
+  isCorrect        Boolean         @default(false) @map("is_correct")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt          UserExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question         Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([attemptId, questionId])
+  @@map("user_answers")
+}
+
+model SpeakingHistory {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  vocabularyId    String?     @map("vocabulary_id")
+  word            String
+  accuracyScore   Float       @map("accuracy_score")
+  transcribedText String?     @map("transcribed_text")
+  phonemeScores   Json?       @map("phoneme_scores")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary      Vocabulary? @relation(fields: [vocabularyId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("speaking_histories")
-}
-
-model UserFlashcard {
-  id             String    @id @default(uuid())
-  userId         String
-  wordId         String
-  repetition     Int       @default(0) // Số lần ôn liên tiếp đúng
-  interval       Int       @default(0) // Khoảng cách ngày đến lần ôn tiếp
-  easinessFactor Float     @default(2.5) // Hệ số EF (mặc định 2.5)
-  nextReviewDate DateTime  @default(now()) // Thời điểm cần ôn tiếp theo
-  lastReviewedAt DateTime?
-
-  @@unique([userId, wordId])
 }
