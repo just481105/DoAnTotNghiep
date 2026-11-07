@@ -5,7 +5,7 @@ CREATE TYPE "Role" AS ENUM ('STUDENT', 'CONTENT_ADMIN', 'SUPER_ADMIN');
 CREATE TYPE "ExamType" AS ENUM ('VSTEP', 'CEFR', 'IELTS_MOCK', 'GENERAL');
 
 -- CreateEnum
-CREATE TYPE "SkillType" AS ENUM ('LISTENING', 'READING', 'WRITING', 'SPEAKING');
+CREATE TYPE "SkillType" AS ENUM ('LISTENING', 'READING');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -17,6 +17,7 @@ CREATE TABLE "users" (
     "role" "Role" NOT NULL DEFAULT 'STUDENT',
     "streak_days" INTEGER NOT NULL DEFAULT 0,
     "xp_points" INTEGER NOT NULL DEFAULT 0,
+    "last_studied_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -34,6 +35,7 @@ CREATE TABLE "vocabularies" (
     "meaning_en" TEXT,
     "example_en" TEXT NOT NULL,
     "example_vi" TEXT,
+    "collocations" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "audio_url" TEXT,
     "topic" TEXT NOT NULL DEFAULT 'Tổng quát',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -110,29 +112,28 @@ CREATE TABLE "user_exam_attempts" (
 );
 
 -- CreateTable
-CREATE TABLE "speaking_histories" (
+CREATE TABLE "user_answers" (
     "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "word" TEXT NOT NULL,
-    "accuracy_score" DOUBLE PRECISION NOT NULL,
-    "transcribed_text" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attempt_id" TEXT NOT NULL,
+    "question_id" TEXT NOT NULL,
+    "selected_option_id" TEXT,
+    "is_correct" BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT "speaking_histories_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "user_answers_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "UserFlashcard" (
+CREATE TABLE "speaking_histories" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "wordId" TEXT NOT NULL,
-    "repetition" INTEGER NOT NULL DEFAULT 0,
-    "interval" INTEGER NOT NULL DEFAULT 0,
-    "easinessFactor" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
-    "nextReviewDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastReviewedAt" TIMESTAMP(3),
+    "user_id" TEXT NOT NULL,
+    "vocabulary_id" TEXT,
+    "word" TEXT NOT NULL,
+    "accuracy_score" DOUBLE PRECISION NOT NULL,
+    "transcribed_text" TEXT,
+    "phoneme_scores" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "UserFlashcard_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "speaking_histories_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -145,13 +146,25 @@ CREATE UNIQUE INDEX "vocabularies_word_key" ON "vocabularies"("word");
 CREATE INDEX "vocabularies_topic_idx" ON "vocabularies"("topic");
 
 -- CreateIndex
+CREATE INDEX "user_sm2_stats_user_id_next_review_at_idx" ON "user_sm2_stats"("user_id", "next_review_at");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "user_sm2_stats_user_id_vocabulary_id_key" ON "user_sm2_stats"("user_id", "vocabulary_id");
 
 -- CreateIndex
-CREATE INDEX "speaking_histories_user_id_idx" ON "speaking_histories"("user_id");
+CREATE INDEX "questions_exam_id_order_index_idx" ON "questions"("exam_id", "order_index");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserFlashcard_userId_wordId_key" ON "UserFlashcard"("userId", "wordId");
+CREATE UNIQUE INDEX "question_options_question_id_option_label_key" ON "question_options"("question_id", "option_label");
+
+-- CreateIndex
+CREATE INDEX "user_exam_attempts_user_id_exam_id_idx" ON "user_exam_attempts"("user_id", "exam_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_answers_attempt_id_question_id_key" ON "user_answers"("attempt_id", "question_id");
+
+-- CreateIndex
+CREATE INDEX "speaking_histories_user_id_idx" ON "speaking_histories"("user_id");
 
 -- AddForeignKey
 ALTER TABLE "user_sm2_stats" ADD CONSTRAINT "user_sm2_stats_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -172,4 +185,16 @@ ALTER TABLE "user_exam_attempts" ADD CONSTRAINT "user_exam_attempts_user_id_fkey
 ALTER TABLE "user_exam_attempts" ADD CONSTRAINT "user_exam_attempts_exam_id_fkey" FOREIGN KEY ("exam_id") REFERENCES "exams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "user_answers" ADD CONSTRAINT "user_answers_attempt_id_fkey" FOREIGN KEY ("attempt_id") REFERENCES "user_exam_attempts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_answers" ADD CONSTRAINT "user_answers_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_answers" ADD CONSTRAINT "user_answers_selected_option_id_fkey" FOREIGN KEY ("selected_option_id") REFERENCES "question_options"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "speaking_histories" ADD CONSTRAINT "speaking_histories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "speaking_histories" ADD CONSTRAINT "speaking_histories_vocabulary_id_fkey" FOREIGN KEY ("vocabulary_id") REFERENCES "vocabularies"("id") ON DELETE SET NULL ON UPDATE CASCADE;

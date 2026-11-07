@@ -35,4 +35,4 @@ venv/
 
 # Python cache
 __pycache__/
-*.py[cod]
+*.py[cod]review_*.txt
