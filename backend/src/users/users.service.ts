@@ -88,40 +88,4 @@ export class UsersService {
     };
   }
 
-  async recordSpeakingPractice(userId: string, data: { word: string; accuracyScore: number; transcribedText?: string }) {
-  // 1. Tính toán điểm XP thưởng (Đạt trên 80% thưởng 20 XP, dưới 80% thưởng 10 XP động viên)
-  const earnedXp = data.accuracyScore >= 80 ? 20 : 10;
-
-  // 2. Ghi nhận lịch sử luyện nói
-    const record = await (this.prisma as any).speakingHistory.create({
-      data: {
-        userId,
-        word: data.word,
-        accuracyScore: data.accuracyScore,
-        transcribedText: data.transcribedText || '',
-      },
-    });
-
-  // 3. Cập nhật tổng điểm XP và ngày học của User
-  const updatedUser = await this.prisma.user.update({
-    where: { id: userId },
-    data: {
-      xpPoints: { increment: earnedXp },
-    },
-    select: {
-      id: true,
-      fullName: true,
-      xpPoints: true,
-      streakDays: true,
-    },
-  });
-
-  return {
-    success: true,
-    earnedXp,
-    totalXp: updatedUser.xpPoints,
-    record,
-  };
-}
-
 }
