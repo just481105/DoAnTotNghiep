@@ -10,8 +10,9 @@ export async function fetchWithAuth<T = unknown>(
 ): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
