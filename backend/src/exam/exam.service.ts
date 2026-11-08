@@ -1,117 +1,90 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ExamService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 1. Lấy danh sách đề thi (kèm fallback nếu database chưa có)
-  async getAllExams() {
-    try {
-      const exams = await (this.prisma as any).exam.findMany({
-        where: { isPublished: true },
-        include: {
-          _count: { select: { questions: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (exams && exams.length > 0) {
-        return exams;
-      }
-    } catch (err) {
-      console.warn('Lỗi truy vấn danh sách đề thi, chuyển fallback:', err);
-    }
-
-    return [
-      {
-        id: 'exam-vstep-b2-01',
-        title: 'VSTEP Reading Mock Test 01 (B1 - B2)',
-        description: 'Đề thi thử kỹ năng Đọc hiểu định dạng VSTEP kiểm tra từ vựng ngữ cảnh kinh tế và xã hội.',
-        examType: 'VSTEP',
-        durationMin: 15,
-        totalMarks: 30,
-        _count: { questions: 3 },
-      },
-    ];
+  getAllExams() {
+    return this.prisma.exam.findMany({
+      where: { isPublished: true },
+      include: { _count: { select: { questions: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
-  // 2. Lấy chi tiết đề thi và các câu hỏi trắc nghiệm
+  // Không trả isCorrect và explanation trước khi nộp bài
   async getExamById(id: string) {
-    const exam = await (this.prisma as any).exam.findUnique({
+    const exam = await this.prisma.exam.findUnique({
       where: { id },
       include: {
         questions: {
           orderBy: { orderIndex: 'asc' },
-          include: {
+          select: {
+            id: true,
+            prompt: true,
+            passageText: true,
+            audioUrl: true,
+            orderIndex: true,
             options: {
-              select: {
-                id: true,
-                optionLabel: true,
-                content: true,
-              },
+              orderBy: { optionLabel: 'asc' },
+              select: { id: true, optionLabel: true, content: true },
             },
           },
         },
       },
     });
 
-    if (!exam) throw new NotFoundException('Không tìm thấy đề thi');
+    if (!exam || !exam.isPublished) throw new NotFoundException('Không tìm thấy đề thi');
     return exam;
   }
 
-  // 3. Chấm điểm tự động và LƯU TRỰC TIẾP vào bảng user_exam_attempts
   async submitExam(userId: string, examId: string, userAnswers: Record<string, string>) {
-    console.log(`\n========================================`);
-    console.log(`📩 Nhận bài nộp: examId=${examId} | userId=${userId}`);
-
-    const exam = await (this.prisma as any).exam.findUnique({
+    const exam = await this.prisma.exam.findUnique({
       where: { id: examId },
-      include: {
-        questions: {
-          include: { options: true },
-        },
-      },
+      include: { questions: { include: { options: true } } },
     });
 
-    if (!exam) throw new NotFoundException('Không tìm thấy đề thi');
+    if (!exam || !exam.isPublished) throw new NotFoundException('Không tìm thấy đề thi');
+    if (exam.questions.length === 0) {
+      throw new BadRequestException('Đề thi chưa có câu hỏi');
+    }
 
     let totalCorrect = 0;
-    const reviewDetails = [];
-
-    for (const q of exam.questions) {
-      const selectedOptionId = userAnswers[q.id];
-      const correctOption = q.options.find((opt: any) => opt.isCorrect);
-      const isCorrect = selectedOptionId === correctOption?.id;
-
+    const reviewDetails = exam.questions.map((q) => {
+      const requested = userAnswers[q.id];
+      // chỉ nhận đáp án thuộc đúng câu hỏi này
+      const selected = q.options.find((o) => o.id === requested) ?? null;
+      const correct = q.options.find((o) => o.isCorrect) ?? null;
+      const isCorrect = !!selected && selected.id === correct?.id;
       if (isCorrect) totalCorrect++;
 
-      reviewDetails.push({
+      return {
         questionId: q.id,
         prompt: q.prompt,
         explanation: q.explanation,
-        selectedOptionId: selectedOptionId || null,
-        correctOptionId: correctOption?.id,
+        selectedOptionId: selected?.id ?? null,
+        correctOptionId: correct?.id ?? null,
         isCorrect,
-      });
-    }
+      };
+    });
 
     const score = Math.round((totalCorrect / exam.questions.length) * 100);
 
-    // Ghi dữ liệu vào PostgreSQL
-    const attempt = await (this.prisma as any).userExamAttempt.create({
-      data: {
-        userId,
-        examId,
-        score,
-        totalCorrect,
-        completedAt: new Date(),
-      },
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.userExamAttempt.create({
+        data: { userId, examId, score, totalCorrect, completedAt: new Date() },
+      });
+      await tx.userAnswer.createMany({
+        data: reviewDetails.map((r) => ({
+          attemptId: created.id,
+          questionId: r.questionId,
+          selectedOptionId: r.selectedOptionId,
+          isCorrect: r.isCorrect,
+        })),
+      });
+      return created;
     });
-
-    console.log(`✅ ĐÃ LƯU KẾT QUẢ THI VÀO POSTGRESQL!`);
-    console.log(`🆔 Mã lần thi: ${attempt.id} | Điểm: ${score}% | Số câu đúng: ${totalCorrect}/${exam.questions.length}`);
-    console.log(`========================================\n`);
 
     return {
       attemptId: attempt.id,
