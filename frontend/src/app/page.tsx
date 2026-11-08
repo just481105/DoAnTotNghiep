@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { fetchWithAuth } from "@/services/api-client";
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
@@ -82,12 +83,6 @@ const ROADMAPS = [
   },
 ];
 
-const LEADERBOARD = [
-  { name: "Nguyễn Minh Anh · 12A1", count: 114, avatar: "N", color: "bg-blue-600" },
-  { name: "Trần Gia Bảo · 12A3", count: 102, avatar: "T", color: "bg-slate-500" },
-  { name: "Lê Khánh Linh · 11A2", count: 96, avatar: "L", color: "bg-rose-500" },
-];
-
 const TOP_TOPICS = {
   main: {
     title: "Câu điều kiện & Câu ước",
@@ -156,12 +151,6 @@ const DEFAULT_GRAMMAR_STYLE = { emoji: "📘", tone: "from-sky-100 to-blue-200" 
 /* ------------------------------------------------------------------ */
 /*  HEATMAP (dữ liệu giả ổn định, TODO: thay bằng dữ liệu bài làm thật) */
 /* ------------------------------------------------------------------ */
-const HEAT_MONTHS = [
-  { label: "Tháng 07", weeks: 4 },
-  { label: "Tháng 08", weeks: 5 },
-  { label: "Tháng 09", weeks: 4 },
-  { label: "Tháng 10", weeks: 4 },
-];
 const DAY_LABELS = ["T2", "", "T4", "", "T6", "", "CN"];
 const HEAT_COLORS = [
   "bg-slate-200/70 dark:bg-slate-700/60",
@@ -170,12 +159,41 @@ const HEAT_COLORS = [
   "bg-emerald-600",
 ];
 
-function heatLevel(seed: number): number {
-  const r = ((seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-  if (r > 0.96) return 3;
-  if (r > 0.92) return 2;
-  if (r > 0.86) return 1;
+const HEAT_WEEKS = 17;
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function heatLevel(count: number): number {
+  if (count >= 4) return 3;
+  if (count >= 2) return 2;
+  if (count >= 1) return 1;
   return 0;
+}
+
+/** Lưới hoạt động: HEAT_WEEKS cột (tuần bắt đầu thứ Hai) x 7 ngày, kết thúc ở tuần hiện tại. */
+function buildHeatmap(activity: Record<string, number>) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - ((today.getDay() + 6) % 7) - (HEAT_WEEKS - 1) * 7);
+
+  let prevMonth = -1;
+  return Array.from({ length: HEAT_WEEKS }, (_, w) => {
+    const days = Array.from({ length: 7 }, (__, d) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + w * 7 + d);
+      const key = dayKey(date);
+      return { key, count: activity[key] ?? 0, future: date > today };
+    });
+    const first = new Date(start);
+    first.setDate(start.getDate() + w * 7);
+    const month = first.getMonth();
+    const label = month !== prevMonth ? `Tháng ${String(month + 1).padStart(2, "0")}` : "";
+    prevMonth = month;
+    return { label, days };
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -208,6 +226,22 @@ export default function DashboardPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [grammarLessons, setGrammarLessons] = useState<ExamItem[]>([]);
+  const [activity, setActivity] = useState<Record<string, number>>({});
+  const [ranking, setRanking] = useState<
+    { id: string; name: string; xp: number; rank: number; avatar: string }[]
+  >([]);
+
+  // Hoạt động học và bảng xếp hạng XP thật (cần đăng nhập)
+  useEffect(() => {
+    fetchWithAuth<{ topRankings: typeof ranking }>("/users/me/dashboard-stats")
+      .then((d) => setRanking(d.topRankings ?? []))
+      .catch(() => {});
+    fetchWithAuth<{ date: string; count: number }[]>("/users/me/activity?days=120")
+      .then((rows) =>
+        setActivity(Object.fromEntries(rows.map((r) => [r.date, r.count]))),
+      )
+      .catch(() => {});
+  }, []);
 
   // Lấy bài ngữ pháp thật từ backend (MongoDB)
   useEffect(() => {
@@ -285,7 +319,7 @@ export default function DashboardPage() {
   const resetPage = () => setPage(1);
   const MainTopicIcon = TOP_TOPICS.main.icon;
 
-  let heatSeed = 0;
+  const heatmap = buildHeatmap(activity);
 
   return (
     <div className="relative min-h-screen bg-[#fbfbfd] pb-20 dark:bg-slate-950">
@@ -382,22 +416,22 @@ export default function DashboardPage() {
                     </span>
                   ))}
                 </div>
-
-                {HEAT_MONTHS.map((m) => (
-                  <div key={m.label}>
-                    <div className="mb-2 h-4 text-sm font-medium text-slate-600 dark:text-slate-300">{m.label}</div>
-                    <div className="flex gap-1.5">
-                      {Array.from({ length: m.weeks }).map((_, w) => (
-                        <div key={w} className="flex flex-col gap-1.5">
-                          {Array.from({ length: 7 }).map((__, d) => {
-                            const lvl = heatLevel(++heatSeed);
-                            return <span key={d} className={`size-3.5 rounded-full ${HEAT_COLORS[lvl]}`} />;
-                          })}
-                        </div>
+                <div className="flex gap-1.5">
+                  {heatmap.map((week, w) => (
+                    <div key={w} className="flex flex-col gap-1.5">
+                      <div className="mb-2 h-4 whitespace-nowrap text-sm font-medium text-slate-600 dark:text-slate-300">
+                        {week.label}
+                      </div>
+                      {week.days.map((c) => (
+                        <span
+                          key={c.key}
+                          title={`${c.key}: ${c.count} hoạt động`}
+                          className={`size-3.5 rounded-full ${c.future ? "opacity-0" : HEAT_COLORS[heatLevel(c.count)]}`}
+                        />
                       ))}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -412,7 +446,7 @@ export default function DashboardPage() {
                 <div>
                   <h2 className={`whitespace-nowrap text-lg font-extrabold ${HEADING}`}>BXH Học Tập</h2>
                   <p className={`flex items-center gap-1 text-sm ${MUTED}`}>
-                    <Zap className="size-3.5" /> Tuần này
+                    <Zap className="size-3.5" /> Tổng điểm XP
                   </p>
                 </div>
               </div>
@@ -423,28 +457,32 @@ export default function DashboardPage() {
 
             <div className="mt-5 flex items-center justify-between px-2 text-[11px] font-bold tracking-wider text-slate-400">
               <span>#&nbsp;&nbsp;&nbsp;&nbsp;HỌC SINH</span>
-              <span>BÀI LÀM</span>
+              <span>XP</span>
             </div>
 
             <div className="mt-2 space-y-2.5">
-              {LEADERBOARD.map((u, i) => (
-                <div
-                  key={u.name}
-                  className="flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/10"
-                >
-                  <span className="grid w-7 place-items-center text-amber-500">
-                    {i === 0 ? <Crown className="size-5" /> : <Medal className="size-5" />}
-                  </span>
-                  <span className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white ${u.color}`}>
-                    {u.avatar}
-                  </span>
-                  <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${HEADING}`}>{u.name}</span>
-                  <span className="shrink-0 text-right">
-                    <b className="text-base text-orange-700 dark:text-orange-400">{u.count}</b>{" "}
-                    <span className="text-xs text-slate-400">bài</span>
-                  </span>
-                </div>
-              ))}
+              {ranking.length === 0 ? (
+                <p className="py-6 text-center text-xs text-slate-400">Chưa có dữ liệu xếp hạng.</p>
+              ) : (
+                ranking.map((u, i) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/10"
+                  >
+                    <span className="grid w-7 place-items-center text-amber-500">
+                      {i === 0 ? <Crown className="size-5" /> : <Medal className="size-5" />}
+                    </span>
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {u.avatar}
+                    </span>
+                    <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${HEADING}`}>{u.name}</span>
+                    <span className="shrink-0 text-right">
+                      <b className="text-base text-orange-700 dark:text-orange-400">{u.xp}</b>{" "}
+                      <span className="text-xs text-slate-400">XP</span>
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </div>
