@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProgressService } from '../users/progress.service';
 import { ReviewGradeDto } from './dto/create-sm2.dto';
 import { calculateSm2 } from './sm2.algorithm';
-import { ProgressService } from '../users/progress.service';
+
+export type WordMode = 'study' | 'due' | 'new' | 'all';
+
+const SESSION_SIZE = 20;
 
 @Injectable()
 export class Sm2Service {
@@ -11,163 +16,138 @@ export class Sm2Service {
     private readonly progress: ProgressService,
   ) {}
 
-  /**
-   * API: Lấy danh sách từ vựng cần ôn tập hôm nay của học viên
-   */
-  async getDueWords(userId: string) {
-    const now = new Date();
-
+  getDueWords(userId: string) {
     return this.prisma.userSm2Stats.findMany({
-      where: {
-        userId,
-        nextReviewAt: {
-          lte: now, // Những từ có lịch ôn tập nhỏ hơn hoặc bằng hiện tại
-        },
-      },
-      include: {
-        vocabulary: true,
-      },
-      take: 20, // Giới hạn 20 thẻ mỗi phiên học
+      where: { userId, nextReviewAt: { lte: new Date() } },
+      include: { vocabulary: true },
+      orderBy: { nextReviewAt: 'asc' },
+      take: SESSION_SIZE,
     });
   }
 
-  /**
-   * API: Ghi nhận điểm đánh giá (0-5) và cập nhật tiến trình SM-2 vào PostgreSQL
-   */
-
-async getAllVocabularies() {
-  return this.prisma.vocabulary.findMany({
-    orderBy: { createdAt: 'asc' },
-  });
-}
-
+  getAllVocabularies() {
+    return this.prisma.vocabulary.findMany({ orderBy: { createdAt: 'asc' } });
+  }
 
   async processReview(userId: string, dto: ReviewGradeDto) {
     const { vocabularyId, quality } = dto;
 
-    // Tìm trạng thái học của từ vựng này trong DB
-    let stat = await this.prisma.userSm2Stats.findUnique({
-      where: {
-        userId_vocabularyId: { userId, vocabularyId },
-      },
+    const stat = await this.prisma.userSm2Stats.findUnique({
+      where: { userId_vocabularyId: { userId, vocabularyId } },
     });
 
-    // Nếu học lần đầu, khởi tạo các chỉ số mặc định
-    const currentRep = stat ? stat.repetitions : 0;
-    const currentInterval = stat ? stat.intervalDays : 0;
-    const currentEf = stat ? stat.easinessFactor : 2.5;
-
-    // Áp dụng thuật toán SM-2
     const calculated = calculateSm2(quality, {
-      repetitions: currentRep,
-      intervalDays: currentInterval,
-      easinessFactor: currentEf,
+      repetitions: stat?.repetitions ?? 0,
+      intervalDays: stat?.intervalDays ?? 0,
+      easinessFactor: stat?.easinessFactor ?? 2.5,
     });
 
-    // Cập nhật hoặc thêm mới vào bảng user_sm2_stats
+    const data = {
+      repetitions: calculated.repetitions,
+      intervalDays: calculated.intervalDays,
+      easinessFactor: calculated.easinessFactor,
+      nextReviewAt: calculated.nextReviewAt,
+      lastQuality: quality,
+    };
+
     const saved = await this.prisma.userSm2Stats.upsert({
-      where: {
-        userId_vocabularyId: { userId, vocabularyId },
-      },
-      update: {
-        repetitions: calculated.repetitions,
-        intervalDays: calculated.intervalDays,
-        easinessFactor: calculated.easinessFactor,
-        nextReviewAt: calculated.nextReviewAt,
-        lastQuality: quality,
-      },
-      create: {
-        userId,
-        vocabularyId,
-        repetitions: calculated.repetitions,
-        intervalDays: calculated.intervalDays,
-        easinessFactor: calculated.easinessFactor,
-        nextReviewAt: calculated.nextReviewAt,
-        lastQuality: quality,
-      },
-      include: {
-        vocabulary: true,
-      },
+      where: { userId_vocabularyId: { userId, vocabularyId } },
+      update: data,
+      create: { userId, vocabularyId, ...data },
+      include: { vocabulary: true },
     });
+
     await this.progress.award(userId, 2);
     return saved;
   }
 
-async getVocabularyTopics(userId: string) {
-  // Lấy toàn bộ từ vựng kèm trạng thái SM-2 của học viên
-  const vocabularies = await this.prisma.vocabulary.findMany({
-    include: {
-      sm2Stats: { where: { userId } },
-    },
-  });
+  async getVocabularyTopics(userId: string) {
+    const [totals, stats] = await Promise.all([
+      this.prisma.vocabulary.groupBy({
+        by: ['topic'],
+        _count: { _all: true },
+        orderBy: { topic: 'asc' },
+      }),
+      this.prisma.userSm2Stats.findMany({
+        select: {
+          userId: true,
+          repetitions: true,
+          vocabulary: { select: { topic: true } },
+        },
+      }),
+    ]);
 
-  // Gom nhóm theo topic (tag)
-  const topicMap: Record<string, { totalWords: number; learnedWords: number }> = {};
+    const learnedByTopic = new Map<string, number>();
+    const sessionsByTopic = new Map<string, number>();
+    for (const s of stats) {
+      const topic = s.vocabulary.topic;
+      sessionsByTopic.set(topic, (sessionsByTopic.get(topic) ?? 0) + 1);
+      if (s.userId === userId && s.repetitions > 0) {
+        learnedByTopic.set(topic, (learnedByTopic.get(topic) ?? 0) + 1);
+      }
+    }
 
-  for (const v of vocabularies) {
-    const topic = v.topic || "Tổng quát";
-    if (!topicMap[topic]) {
-      topicMap[topic] = { totalWords: 0, learnedWords: 0 };
-    }
-    topicMap[topic].totalWords += 1;
-    if (v.sm2Stats && v.sm2Stats.length > 0 && v.sm2Stats[0].repetitions > 0) {
-      topicMap[topic].learnedWords += 1;
-    }
+    return totals.map((t, index) => {
+      const wordCount = t._count._all;
+      const learned = learnedByTopic.get(t.topic) ?? 0;
+      const progressPercent = wordCount > 0 ? Math.round((learned / wordCount) * 100) : 0;
+      return {
+        id: `topic-${index + 1}`,
+        slug: encodeURIComponent(t.topic),
+        title: t.topic,
+        desc: 'Bắt đầu bài tập để ghi nhớ từ vựng mới hoặc ôn tập lại.',
+        wordCount,
+        learnCount: sessionsByTopic.get(t.topic) ?? 0,
+        progressPercent,
+        isLearned: progressPercent > 0,
+      };
+    });
   }
 
-  // Trả về danh sách card giống ảnh mẫu
-  return Object.keys(topicMap).map((topicName, index) => {
-    const info = topicMap[topicName];
-    const progress = info.totalWords > 0 ? Math.round((info.learnedWords / info.totalWords) * 100) : 0;
-    return {
-      id: `topic-${index + 1}`,
-      slug: encodeURIComponent(topicName),
-      title: topicName,
-      desc: "Bắt đầu bài tập để ghi nhớ từ vựng mới hoặc ôn tập lại.",
-      wordCount: info.totalWords,
-      learnCount: 200 + index * 125, // Mock số lượt học cộng đồng
-      progressPercent: progress,
-      isLearned: progress > 0,
-    };
-  });
-}
+  async getWordsByTopic(userId: string, topic?: string, mode: WordMode = 'all') {
+    const now = new Date();
+    const and: Prisma.VocabularyWhereInput[] = [];
 
-async getWordsByTopic(userId: string, topic?: string) {
-  const whereCondition: any = {};
-  if (topic && topic !== 'all') {
-    whereCondition.topic = { equals: topic, mode: 'insensitive' };
+    if (topic && topic !== 'all') {
+      and.push({ topic: { equals: topic, mode: 'insensitive' } });
+    }
+
+    const isNew: Prisma.VocabularyWhereInput = { sm2Stats: { none: { userId } } };
+    const isDue: Prisma.VocabularyWhereInput = {
+      sm2Stats: { some: { userId, nextReviewAt: { lte: now } } },
+    };
+
+    if (mode === 'new') and.push(isNew);
+    else if (mode === 'due') and.push(isDue);
+    else if (mode === 'study') and.push({ OR: [isDue, isNew] });
+
+    const vocabularies = await this.prisma.vocabulary.findMany({
+      where: { AND: and },
+      include: { sm2Stats: { where: { userId } } },
+      orderBy: { createdAt: 'asc' },
+      take: mode === 'all' ? undefined : SESSION_SIZE,
+    });
+
+    return vocabularies.map((v) => {
+      const stats = v.sm2Stats[0] ?? null;
+      return {
+        id: v.id,
+        word: v.word,
+        pos: v.pos,
+        cefrLevel: v.cefrLevel,
+        ipa: v.ipa,
+        meaningVi: v.meaningVi,
+        meaningEn: v.meaningEn,
+        exampleEn: v.exampleEn,
+        exampleVi: v.exampleVi,
+        collocations: v.collocations,
+        audioUrl: v.audioUrl,
+        topic: v.topic,
+        repetitions: stats?.repetitions ?? 0,
+        intervalDays: stats?.intervalDays ?? 0,
+        easinessFactor: stats?.easinessFactor ?? 2.5,
+        nextReviewAt: stats?.nextReviewAt ?? null,
+      };
+    });
   }
-
-  const vocabularies = await this.prisma.vocabulary.findMany({
-    where: whereCondition,
-    include: {
-      sm2Stats: {
-        where: { userId },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  // Định dạng lại dữ liệu trả về cho Flashcard Engine
-  return vocabularies.map((v) => {
-    const stats = v.sm2Stats[0] || null;
-    return {
-      id: v.id,
-      word: v.word,
-      pos: v.pos,
-      cefrLevel: v.cefrLevel,
-      ipa: v.ipa,
-      meaningVi: v.meaningVi,
-      meaningEn: v.meaningEn,
-      exampleEn: v.exampleEn,
-      exampleVi: v.exampleVi,
-      audioUrl: v.audioUrl,
-      topic: v.topic,
-      repetitions: stats ? stats.repetitions : 0,
-      intervalDays: stats ? stats.intervalDays : 0,
-      easinessFactor: stats ? stats.easinessFactor : 2.5,
-    };
-  });
-}
-
 }
