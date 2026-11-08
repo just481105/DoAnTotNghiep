@@ -1,8 +1,4 @@
-const CORE_API_URL = (
-  process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:5001'
-)
-  .replace(/\/api\/v1\/?$/, '')
-  .replace(/\/+$/, '');
+import { CORE_API_URL } from '@/lib/config';
 
 export async function fetchWithAuth<T = unknown>(
   endpoint: string,

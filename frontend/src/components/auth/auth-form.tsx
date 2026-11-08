@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CORE_API_URL } from "@/lib/config";
 import {
   ArrowRight,
   BookOpen,
@@ -44,9 +45,7 @@ function getErrorMessage(value: unknown): string | undefined {
       : undefined;
 }
 
-const API_URL = (
-  process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001"
-).replace(/\/+$/, "");
+const API_URL = CORE_API_URL;
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const isRegister = mode === "register";
