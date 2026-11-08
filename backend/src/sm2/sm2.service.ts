@@ -1,63 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewGradeDto } from './dto/create-sm2.dto';
+import { calculateSm2 } from './sm2.algorithm';
 
 @Injectable()
 export class Sm2Service {
   constructor(private readonly prisma: PrismaService) {}
-
-  /**
-   * Hàm toán học tính toán các chỉ số SM-2
-   */
-  calculateSm2(
-    quality: number,
-    currentRepetitions: number,
-    currentInterval: number,
-    currentEf: number,
-  ) {
-    let repetitions = currentRepetitions;
-    let intervalDays = currentInterval;
-    let easinessFactor = currentEf;
-
-    if (quality >= 3) {
-      // Nhớ thành công
-      if (repetitions === 0) {
-        intervalDays = 1;
-      } else if (repetitions === 1) {
-        intervalDays = 6;
-      } else {
-        intervalDays = Math.round(intervalDays * easinessFactor);
-      }
-      repetitions += 1;
-    } else {
-      // Quên từ hoặc nhớ sai nghiêm trọng
-      repetitions = 0;
-      intervalDays = 1;
-    }
-
-    // Công thức cập nhật hệ số dễ EF chuẩn SuperMemo-2
-    easinessFactor =
-      easinessFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-
-    // Ngưỡng chặn dưới của EF là 1.3
-    if (easinessFactor < 1.3) {
-      easinessFactor = 1.3;
-    }
-
-    // Làm tròn 2 chữ số thập phân
-    easinessFactor = Math.round(easinessFactor * 100) / 100;
-
-    // Tính mốc thời gian ôn tập kế tiếp (hiện tại + interval ngày)
-    const nextReviewAt = new Date();
-    nextReviewAt.setDate(nextReviewAt.getDate() + intervalDays);
-
-    return {
-      repetitions,
-      intervalDays,
-      easinessFactor,
-      nextReviewAt,
-    };
-  }
 
   /**
    * API: Lấy danh sách từ vựng cần ôn tập hôm nay của học viên
@@ -106,12 +54,11 @@ async getAllVocabularies() {
     const currentEf = stat ? stat.easinessFactor : 2.5;
 
     // Áp dụng thuật toán SM-2
-    const calculated = this.calculateSm2(
-      quality,
-      currentRep,
-      currentInterval,
-      currentEf,
-    );
+    const calculated = calculateSm2(quality, {
+      repetitions: currentRep,
+      intervalDays: currentInterval,
+      easinessFactor: currentEf,
+    });
 
     // Cập nhật hoặc thêm mới vào bảng user_sm2_stats
     return this.prisma.userSm2Stats.upsert({
