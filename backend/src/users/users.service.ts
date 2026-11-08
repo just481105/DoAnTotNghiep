@@ -68,15 +68,9 @@ export class UsersService {
     }));
 
     return {
-      user: {
-        ...currentUser,
-        cefrLevel: 'B2',
-      },
+      user: currentUser,
       stats: {
-        totalSubmissions: 10230, // Mô phỏng tổng bài nộp
-        activeLearners: activeLearners || 1,
-        b1Completed: 1844,
-        b2Completed: 1045,
+        activeLearners,
         dueTodayCount,
       },
       retentionCurve: [

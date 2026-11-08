@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewGradeDto } from './dto/create-sm2.dto';
 import { calculateSm2 } from './sm2.algorithm';
+import { ProgressService } from '../users/progress.service';
 
 @Injectable()
 export class Sm2Service {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly progress: ProgressService,
+  ) {}
 
   /**
    * API: Lấy danh sách từ vựng cần ôn tập hôm nay của học viên
@@ -61,7 +65,7 @@ async getAllVocabularies() {
     });
 
     // Cập nhật hoặc thêm mới vào bảng user_sm2_stats
-    return this.prisma.userSm2Stats.upsert({
+    const saved = await this.prisma.userSm2Stats.upsert({
       where: {
         userId_vocabularyId: { userId, vocabularyId },
       },
@@ -85,6 +89,8 @@ async getAllVocabularies() {
         vocabulary: true,
       },
     });
+    await this.progress.award(userId, 2);
+    return saved;
   }
 
 async getVocabularyTopics(userId: string) {
