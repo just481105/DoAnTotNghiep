@@ -118,7 +118,6 @@ const SKILL_META: Record<Skill, { label: string; icon: LucideIcon }> = {
 };
 
 const EXAMS: ExamItem[] = [
-  { id: "1", title: "Từ vựng chủ đề Môi trường (Environment)", skill: "vocab", grade: 10, questions: 20, done: false, emoji: "🌿", tone: "from-emerald-100 to-lime-200" },
   { id: "2", href: "/grammar/thi-hien-tai-hoan-thanh", title: "Thì hiện tại hoàn thành & quá khứ đơn", skill: "grammar", grade: 10, questions: 15, done: false, emoji: "⏰", tone: "from-rose-100 to-pink-200" },
   { id: "3", href: "/grammar/menh-de-quan-he", title: "Mệnh đề quan hệ — Bài tập tổng hợp", skill: "grammar", grade: 11, questions: 20, done: false, emoji: "🔗", tone: "from-yellow-100 to-amber-200" },
   { id: "4", href: "/grammar/cau-dieu-kien", title: "Câu điều kiện loại 1, 2, 3", skill: "grammar", grade: 11, questions: 15, done: true, attempts: 2, emoji: "🎓", tone: "from-stone-100 to-orange-100" },
@@ -226,6 +225,7 @@ export default function DashboardPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [grammarLessons, setGrammarLessons] = useState<ExamItem[]>([]);
+  const [vocabLessons, setVocabLessons] = useState<ExamItem[]>([]);
   const [activity, setActivity] = useState<Record<string, number>>({});
   const [ranking, setRanking] = useState<
     { id: string; name: string; xp: number; rank: number; avatar: string }[]
@@ -287,10 +287,51 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Lấy bài từ vựng từ file .md (content/vocabulary)
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/vocabulary")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(
+        (
+          rows: Array<{
+            slug: string;
+            title: string;
+            order: number;
+            grade: number | null;
+            topic: string | null;
+          }>,
+        ) => {
+          if (cancelled || !Array.isArray(rows)) return;
+          setVocabLessons(
+            rows
+              .filter((l) => l.grade === 10 || l.grade === 11 || l.grade === 12)
+              .map((l) => ({
+                id: `vocab-${l.slug}`,
+                title: l.title,
+                skill: "vocab" as const,
+                grade: l.grade as Grade,
+                questions: 0,
+                done: false,
+                emoji: "🧠",
+                tone: "from-sky-100 to-blue-200",
+                order: l.order,
+                topic: l.topic,
+                href: `/vocabulary/${l.slug}`,
+              })),
+          );
+        },
+      )
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Bài ngữ pháp mẫu được thay bằng bài thật từ API
   const allItems = useMemo(
-    () => [...EXAMS.filter((e) => e.skill !== "grammar"), ...grammarLessons],
-    [grammarLessons],
+    () => [...EXAMS.filter((e) => e.skill !== "grammar"), ...vocabLessons, ...grammarLessons],
+    [vocabLessons, grammarLessons],
   );
 
   const daysLeft = useMemo(() => {
@@ -824,12 +865,12 @@ export default function DashboardPage() {
                     <div className="mt-auto flex items-center justify-between border-t border-slate-100 px-1 pt-3 dark:border-slate-800">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          (e.questions > 1 || e.skill === "grammar")
+                          (e.questions > 1 || e.order !== undefined)
                             ? "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
                             : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
                         }`}
                       >
-                        {e.skill === "grammar" ? `Bài ${e.order}` : `${e.questions} câu hỏi`}
+                        {e.order !== undefined ? `Bài ${e.order}` : `${e.questions} câu hỏi`}
                       </span>
                       <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
                         {e.topic ?? SKILL_META[e.skill].label}
