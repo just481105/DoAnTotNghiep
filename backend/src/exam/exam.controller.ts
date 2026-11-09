@@ -10,6 +10,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
 import { ExamService } from './exam.service';
+import { SubmitExamDto } from './dto/submit-exam.dto';
 
 @Controller('exams')
 export class ExamController {
@@ -30,8 +31,8 @@ export class ExamController {
   async submitExam(
     @Param('id') examId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: { answers: Record<string, string> },
+    @Body() body: SubmitExamDto,
   ) {
-    return this.examService.submitExam(user.sub, examId, body.answers || {});
+    return this.examService.submitExam(user.sub, examId, body.answers);
   }
 }

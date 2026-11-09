@@ -35,7 +35,6 @@ interface UserProgress {
   email: string;
   streakDays: number;
   xpPoints: number;
-  cefrLevel: string;
   nextLevelXP: number;
 }
 
@@ -45,7 +44,6 @@ interface DashboardStatsResponse {
     email: string;
     streakDays: number;
     xpPoints: number;
-    cefrLevel: string;
   } | null;
 }
 
@@ -54,7 +52,6 @@ const INITIAL_USER_PROGRESS: UserProgress = {
   email: "",
   streakDays: 0,
   xpPoints: 0,
-  cefrLevel: "B1",
   nextLevelXP: 1000,
 };
 
@@ -122,7 +119,6 @@ export function NavigationBar() {
           email: user.email,
           streakDays: user.streakDays || 0,
           xpPoints,
-          cefrLevel: user.cefrLevel || "B1",
           nextLevelXP: Math.max(1000, (Math.floor(xpPoints / 1000) + 1) * 1000),
         });
       })
@@ -179,7 +175,7 @@ export function NavigationBar() {
           <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
             <GraduationCap className="w-6 h-6" />
           </div>
-          <div className="hidden sm:flex flex-col">
+          <div className="hidden xl:flex flex-col">
             <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-slate-100">
               ENG-PLATFORM
             </span>
@@ -190,7 +186,7 @@ export function NavigationBar() {
         </Link>
 
         {/* KHU VỰC 2: THANH MENU ĐIỀU HƯỚNG NGANG */}
-        <nav className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto py-1">
+        <nav className="flex min-w-0 flex-1 items-center justify-start [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto gap-1.5 overflow-x-auto py-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -208,7 +204,7 @@ export function NavigationBar() {
                 <Icon className={`w-4 h-4 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} />
                 <span>{item.title}</span>
                 {item.badge && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                  <span className="hidden xl:inline text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
                     {item.badge}
                   </span>
                 )}
@@ -271,15 +267,6 @@ export function NavigationBar() {
             <span>{userProgress.xpPoints} XP</span>
           </div>
 
-          {/* 3. HUY HIỆU CẤP ĐỘ CEFR */}
-          <div 
-            title={`Trình độ hiện tại: Khung CEFR ${userProgress.cefrLevel}`}
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs font-black cursor-default"
-          >
-            <Award className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{userProgress.cefrLevel}</span>
-          </div>
-
           {/* 4. CHUÔNG THÔNG BÁO */}
           <button 
             title="Thông báo mới"
@@ -315,7 +302,7 @@ export function NavigationBar() {
                   {/* Tiến độ lên cấp mini */}
                   <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
-                      <span>Cấp độ: {userProgress.cefrLevel}</span>
+                      <span>Điểm kinh nghiệm</span>
                       <span>{userProgress.xpPoints}/{userProgress.nextLevelXP} XP</span>
                     </div>
                     <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -430,10 +417,10 @@ export function NavigationBar() {
                 <div className="mt-6 flex items-end justify-between gap-4 rounded-2xl border border-white/15 bg-white/10 p-4">
                   <div>
                     <p className="text-sm font-medium text-emerald-100">
-                      Trình độ hiện tại
+                      Điểm kinh nghiệm
                     </p>
                     <p className="mt-1 text-3xl font-black">
-                      CEFR {userProgress.cefrLevel}
+                      {userProgress.xpPoints} XP
                     </p>
                   </div>
                   <Award className="mb-1 h-9 w-9 text-emerald-100" aria-hidden="true" />

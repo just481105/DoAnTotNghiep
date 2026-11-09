@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { 
   PenTool, 
   Sparkles, 
@@ -34,27 +34,43 @@ interface WritingResult {
   grammar_errors: GrammarError[];
 }
 
-const SAMPLE_PROMPTS = [
-  {
-    type: "VSTEP Task 2 (Essay)",
-    title: "Online Learning vs Traditional Learning",
-    description: "Some people believe that online learning is more effective than attending traditional classes. To what extent do you agree or disagree? Give reasons and examples."
-  },
-  {
-    type: "VSTEP Task 1 (Letter)",
-    title: "Letter of Complaint",
-    description: "You recently bought a camera online, but it arrived damaged. Write a letter to the store manager to explain the issue and request a replacement or refund."
-  }
-];
+type PromptItem = {
+  id: string;
+  title: string; // tiêu đề đề bài
+  type: string;
+  taskType: "VSTEP_TASK_1" | "VSTEP_TASK_2";
+  description: string;
+};
 
 export default function WritingMentorPage() {
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(0);
+  const [prompts, setPrompts] = useState<PromptItem[]>([]);
+  useEffect(() => {
+    fetch("/api/writing-prompts")
+      .then((r) => r.json())
+      .then((list: any[]) => {
+        const items: PromptItem[] = list.map((x) => ({
+          id: x.id,
+          title: x.promptTitle,
+          type: x.type,
+          taskType: x.taskType,
+          description: x.description,
+        }));
+        setPrompts(items);
+        const topic = new URLSearchParams(window.location.search).get("topic");
+        const idx = items.findIndex((x) => x.id === topic);
+        setSelectedPromptIndex(idx >= 0 ? idx : 0);
+      })
+      .catch(() => {});
+  }, []);
   const [essayContent, setEssayContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<WritingResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const activePrompt = SAMPLE_PROMPTS[selectedPromptIndex];
+  const activePrompt: PromptItem = prompts[selectedPromptIndex] ?? {
+    id: "", title: "Đang tải đề...", type: "VSTEP Task 2", taskType: "VSTEP_TASK_2", description: "",
+  };
   const wordCount = essayContent.trim() ? essayContent.trim().split(/\s+/).length : 0;
 
   const handleEvaluate = async () => {
@@ -73,7 +89,7 @@ export default function WritingMentorPage() {
         body: JSON.stringify({
           prompt: activePrompt.title + ": " + activePrompt.description,
           essay_text: essayContent,
-          task_type: "VSTEP_TASK_2"
+          task_type: activePrompt.taskType
         })
       });
 
@@ -123,7 +139,7 @@ export default function WritingMentorPage() {
               <BookOpen className="w-4 h-4 text-indigo-500" /> Chọn đề bài luyện viết
             </span>
             <div className="flex gap-2">
-              {SAMPLE_PROMPTS.map((p, idx) => (
+              {prompts.map((p, idx) => (
                 <Button
                   key={idx}
                   size="sm"

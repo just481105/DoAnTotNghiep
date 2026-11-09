@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { SpeechEvaluationResult } from "@/types";
 import { fetchWithAuth } from "@/services/api-client";
 
-const AI_GATEWAY_URL =
-  process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8000";
 interface TargetWordItem {
   id?: string;
   word: string;
@@ -270,43 +268,19 @@ function SpeakingContent() {
 
       const formData = new FormData();
       formData.append("audio", blob, "recording.wav");
-      formData.append("target_word", currentTarget.word);
-      formData.append("expected_ipa", currentTarget.ipa);
+      formData.append("word", currentTarget.word);
+      formData.append("ipa", currentTarget.ipa);
 
-      // 1. Gửi sang FastAPI AI Gateway để phân tích âm vị IPA
-      const response = await fetch(`${AI_GATEWAY_URL}/api/v1/evaluate-pronunciation`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errDetail = await response.text();
-        throw new Error(`Mã lỗi ${response.status}: ${errDetail}`);
-      }
-
-      const data = await response.json();
+      // Nest gọi gateway, lưu điểm và cộng XP phía server
+      const data = await fetchWithAuth<SpeechEvaluationResult & SpeakingHistoryResponse>(
+        "/speaking/evaluate",
+        { method: "POST", body: formData },
+      );
       setEvalResult(data);
-
-      // 2. Gửi kết quả về NestJS Core để lưu lịch sử và nhận điểm XP
-      try {
-        const nestData = await fetchWithAuth<SpeakingHistoryResponse>(
-          "/users/me/speaking-history",
-          {
-          method: "POST",
-          body: JSON.stringify({
-            word: currentTarget.word,
-            accuracyScore: data.accuracy_score,
-            transcribedText: data.transcribed_text,
-          }),
-          },
-        );
-        setXpEarned(nestData.earnedXp || 10);
-      } catch (dbErr) {
-        console.warn("Không thể lưu kết quả phát âm vào NestJS:", dbErr);
-      }
+      setXpEarned(data.earnedXp);
     } catch (err: any) {
       console.error(err);
-      setError("Lỗi kết nối AI Speech Gateway. Kiểm tra xem FastAPI (port 8000) đã bật chưa.");
+      setError(err?.message || "Không thể chấm phát âm lúc này. Thử lại sau.");
     } finally {
       setIsEvaluating(false);
     }

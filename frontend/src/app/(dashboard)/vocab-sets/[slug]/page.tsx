@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Volume2, ArrowLeft, Layers, Search, Sparkles } from "lucide-react";
+import { Volume2, ArrowLeft, Layers, Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fetchWithAuth } from "@/services/api-client";
@@ -22,60 +22,46 @@ interface VocabItem {
 
 export default function TopicDetailPage() {
   const params = useParams();
-  const slug = (params?.slug as string) || "economy";
+  const slug = (params?.slug as string) || "";
   const topicName = decodeURIComponent(slug);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [playingWord, setPlayingWord] = useState<string | null>(null);
   const [vocabList, setVocabList] = useState<VocabItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 1. Tự động gọi API lấy từ vựng theo đúng Topic được bấm từ Database
-  useEffect(() => {
-    async function loadTopicWords() {
-      setIsLoading(true);
-      try {
-        const data = await fetchWithAuth(
-          `/sm2/words?topic=${encodeURIComponent(topicName)}`,
-        );
-        if (Array.isArray(data) && data.length > 0) {
-            const formatted: VocabItem[] = data.map((item: any, idx: number) => ({
-              id: item.id,
-              order: idx + 1,
-              word: item.word,
-              pos: (item.pos || "NOUN").toUpperCase(),
-              ipa: item.ipa,
-              meaningVi: item.meaningVi,
-              exampleEn: item.exampleEn,
-              exampleVi: item.exampleVi || "",
-              collocations: item.collocations || [],
-            }));
-            setVocabList(formatted);
-            return;
-        }
-      } catch (err) {
-        console.warn("Không kết nối được backend, nạp danh sách dự phòng:", err);
-      } finally {
-        setIsLoading(false);
-      }
-
-      // Dự phòng nếu chưa có kết nối API
-      setVocabList([
-        {
-          order: 1,
-          word: "economy",
-          pos: "NOUN",
-          ipa: "/ɪˈkɒn.ə.mi/",
-          meaningVi: "Nền kinh tế của một quốc gia hoặc khu vực.",
-          collocations: ["global economy (nền kinh tế toàn cầu)", "boost the economy (thúc đẩy kinh tế)"],
-          exampleEn: "The country's economy is recovering after the crisis.",
-          exampleVi: "Nền kinh tế của đất nước đang phục hồi sau khủng hoảng.",
-        },
-      ]);
+  const loadTopicWords = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchWithAuth<Array<Record<string, unknown>>>(
+        `/sm2/words?topic=${encodeURIComponent(topicName)}`,
+      );
+      const list = Array.isArray(data) ? data : [];
+      setVocabList(
+        list.map((item, idx) => ({
+          id: item.id as string,
+          order: idx + 1,
+          word: String(item.word ?? ""),
+          pos: String(item.pos || "NOUN").toUpperCase(),
+          ipa: String(item.ipa ?? ""),
+          meaningVi: String(item.meaningVi ?? ""),
+          exampleEn: String(item.exampleEn ?? ""),
+          exampleVi: String(item.exampleVi ?? ""),
+          collocations: Array.isArray(item.collocations) ? (item.collocations as string[]) : [],
+        })),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được từ vựng.");
+    } finally {
+      setIsLoading(false);
     }
-
-    loadTopicWords();
   }, [topicName]);
+
+  useEffect(() => {
+    loadTopicWords();
+  }, [loadTopicWords]);
 
   // 2. Phát âm thanh US
   const handlePlayAudio = (word: string) => {
@@ -150,6 +136,18 @@ export default function TopicDetailPage() {
         {isLoading ? (
           <div className="p-12 text-center text-xs text-slate-400 font-semibold animate-pulse">
             Đang tải dữ liệu từ vựng...
+          </div>
+        ) : error ? (
+          <div className="p-10 text-center space-y-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Không tải được từ vựng</p>
+            <p className="text-xs text-slate-500">{error}</p>
+            <Button onClick={loadTopicWords} className="rounded-2xl text-xs gap-2 font-bold">
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </Button>
+          </div>
+        ) : filteredWords.length === 0 ? (
+          <div className="p-12 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+            Chủ đề này chưa có từ vựng.
           </div>
         ) : (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm divide-y divide-slate-100 dark:divide-slate-800/80 overflow-hidden">

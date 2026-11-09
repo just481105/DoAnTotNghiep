@@ -68,15 +68,9 @@ export class UsersService {
     }));
 
     return {
-      user: {
-        ...currentUser,
-        cefrLevel: 'B2',
-      },
+      user: currentUser,
       stats: {
-        totalSubmissions: 10230, // Mô phỏng tổng bài nộp
-        activeLearners: activeLearners || 1,
-        b1Completed: 1844,
-        b2Completed: 1045,
+        activeLearners,
         dueTodayCount,
       },
       retentionCurve: [
@@ -88,40 +82,38 @@ export class UsersService {
     };
   }
 
-  async recordSpeakingPractice(userId: string, data: { word: string; accuracyScore: number; transcribedText?: string }) {
-  // 1. Tính toán điểm XP thưởng (Đạt trên 80% thưởng 20 XP, dưới 80% thưởng 10 XP động viên)
-  const earnedXp = data.accuracyScore >= 80 ? 20 : 10;
+  /** Số hoạt động học mỗi ngày (nộp đề, luyện nói, chấm thẻ SM-2). */
+  async getActivity(userId: string, days: number) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - days);
 
-  // 2. Ghi nhận lịch sử luyện nói
-    const record = await (this.prisma as any).speakingHistory.create({
-      data: {
-        userId,
-        word: data.word,
-        accuracyScore: data.accuracyScore,
-        transcribedText: data.transcribedText || '',
-      },
-    });
+    const [exams, speaking, reviews] = await Promise.all([
+      this.prisma.userExamAttempt.findMany({
+        where: { userId, startedAt: { gte: since } },
+        select: { startedAt: true },
+      }),
+      this.prisma.speakingHistory.findMany({
+        where: { userId, createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
+      this.prisma.userSm2Stats.findMany({
+        where: { userId, updatedAt: { gte: since } },
+        select: { updatedAt: true },
+      }),
+    ]);
 
-  // 3. Cập nhật tổng điểm XP và ngày học của User
-  const updatedUser = await this.prisma.user.update({
-    where: { id: userId },
-    data: {
-      xpPoints: { increment: earnedXp },
-    },
-    select: {
-      id: true,
-      fullName: true,
-      xpPoints: true,
-      streakDays: true,
-    },
-  });
+    const counts = new Map<string, number>();
+    const add = (d: Date) => {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    };
+    exams.forEach((e) => add(e.startedAt));
+    speaking.forEach((e) => add(e.createdAt));
+    reviews.forEach((e) => add(e.updatedAt));
 
-  return {
-    success: true,
-    earnedXp,
-    totalXp: updatedUser.xpPoints,
-    record,
-  };
-}
-
+    return [...counts.entries()]
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
 }

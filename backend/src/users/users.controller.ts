@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
@@ -14,17 +14,13 @@ export class UsersController {
     return this.usersService.getDashboardStats(user.sub);
   }
 
-  @Post('me/speaking-history')
+  @Get('me/activity')
   @UseGuards(JwtAuthGuard)
-  async recordSpeakingHistory(
+  async getActivity(
     @CurrentUser() user: AuthenticatedUser,
-    @Body()
-    body: {
-      word: string;
-      accuracyScore: number;
-      transcribedText?: string;
-    },
+    @Query('days') days?: string,
   ) {
-    return this.usersService.recordSpeakingPractice(user.sub, body);
+    const n = Math.min(Math.max(parseInt(days ?? '120', 10) || 120, 1), 366);
+    return this.usersService.getActivity(user.sub, n);
   }
 }

@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchWithAuth } from "@/services/api-client";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_CORE_API_URL || "http://localhost:5001";
-
 interface QuestionOption {
   id: string;
   optionLabel: string;
@@ -57,32 +55,37 @@ export default function ExamTakingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ExamResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [deadline, setDeadline] = useState<number | null>(null);
 
-  // 1. Tải chi tiết đề thi từ NestJS
-  useEffect(() => {
+  const fetchExam = useCallback(async () => {
     if (!examId) return;
-
-    async function fetchExam() {
-      try {
-        const res = await fetch(`${BACKEND_URL}/exams/${examId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setExam(data);
-          setTimeLeft((data.durationMin || 15) * 60);
-        }
-      } catch (err) {
-        console.error("Lỗi nạp đề thi:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await fetchWithAuth<ExamDetail>(`/exams/${examId}`);
+      setExam(data);
+      const seconds = (data.durationMin || 15) * 60;
+      setTimeLeft(seconds);
+      setDeadline(Date.now() + seconds * 1000);
+    } catch (err) {
+      setExam(null);
+      setLoadError(err instanceof Error ? err.message : "Không tải được đề thi.");
+    } finally {
+      setIsLoading(false);
     }
-    fetchExam();
   }, [examId]);
+
+  useEffect(() => {
+    fetchExam();
+  }, [fetchExam]);
 
   // 3. Gửi bài làm sang NestJS để chấm điểm và lưu vào CSDL
   const handleSubmitExam = useCallback(async () => {
     if (isSubmitting || result || !examId) return;
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const data = await fetchWithAuth<ExamResult>(`/exams/${examId}/submit`, {
         method: "POST",
@@ -93,27 +96,25 @@ export default function ExamTakingPage() {
 
       setResult(data);
     } catch (err) {
-      console.error("Lỗi gửi bài thi:", err);
+      setSubmitError(err instanceof Error ? err.message : "Không nộp được bài, thử lại.");
     } finally {
       setIsSubmitting(false);
     }
   }, [examId, isSubmitting, result, selectedAnswers]);
 
-  // 2. Đồng hồ đếm ngược thời gian
+  // Đồng hồ: một interval duy nhất, tính theo mốc kết thúc
   useEffect(() => {
-    if (timeLeft <= 0 || result) return;
+    if (deadline === null || result) return;
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          void handleSubmitExam();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      setTimeLeft(left);
+      if (left === 0) {
+        clearInterval(timer);
+        void handleSubmitExam();
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, result, handleSubmitExam]);
+  }, [deadline, result, handleSubmitExam]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -132,7 +133,10 @@ export default function ExamTakingPage() {
   if (!exam) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
-        <p className="text-slate-500 text-sm">Không tìm thấy thông tin đề thi.</p>
+        <p className="text-slate-500 text-sm">{loadError || "Không tìm thấy thông tin đề thi."}</p>
+        {loadError && (
+          <Button size="sm" onClick={fetchExam}>Thử lại</Button>
+        )}
         <Link href="/exams">
           <Button variant="outline" size="sm">
             <ArrowLeft className="w-4 h-4 mr-1.5" /> Quay lại danh mục
@@ -292,7 +296,10 @@ export default function ExamTakingPage() {
 
         {/* Nút nộp bài */}
         {!result && (
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center justify-end gap-3 pt-2">
+            {submitError && (
+              <p role="alert" className="text-xs text-rose-600">{submitError}</p>
+            )}
             <Button
               onClick={handleSubmitExam}
               disabled={isSubmitting || Object.keys(selectedAnswers).length === 0}
