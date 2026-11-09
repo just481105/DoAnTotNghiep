@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getVocabulary } from "@/lib/vocabulary";
+import VocabSearchPanel from "@/components/vocabulary/search-panel";
 
 // Giao diện cho từng loại thẻ Markdown (bảng từ vựng gọn hơn bài ngữ pháp)
 const md: Components = {
@@ -66,11 +67,23 @@ export default async function VocabularyPage({
           <p className="mt-3 text-lg text-slate-500 dark:text-slate-400">{lesson.summary}</p>
         )}
 
-        <article className="mt-8">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>
-            {lesson.content}
-          </ReactMarkdown>
-        </article>
+        {(() => {
+          const article = (
+            <article className="mt-8">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>
+                {lesson.content}
+              </ReactMarkdown>
+            </article>
+          );
+          // Chỉ bài Oxford 3000 có dữ liệu từ điển để tìm kiếm
+          return slug === "oxford-3000" ? (
+            <div className="mt-8">
+              <VocabSearchPanel>{article}</VocabSearchPanel>
+            </div>
+          ) : (
+            article
+          );
+        })()}
       </main>
     </div>
   );
