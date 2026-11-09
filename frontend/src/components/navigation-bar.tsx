@@ -175,7 +175,7 @@ export function NavigationBar() {
           <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
             <GraduationCap className="w-6 h-6" />
           </div>
-          <div className="hidden sm:flex flex-col">
+          <div className="hidden xl:flex flex-col">
             <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-slate-100">
               ENG-PLATFORM
             </span>
@@ -186,7 +186,7 @@ export function NavigationBar() {
         </Link>
 
         {/* KHU VỰC 2: THANH MENU ĐIỀU HƯỚNG NGANG */}
-        <nav className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto py-1">
+        <nav className="flex min-w-0 flex-1 items-center justify-start [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto gap-1.5 overflow-x-auto py-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -204,7 +204,7 @@ export function NavigationBar() {
                 <Icon className={`w-4 h-4 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} />
                 <span>{item.title}</span>
                 {item.badge && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                  <span className="hidden xl:inline text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
                     {item.badge}
                   </span>
                 )}

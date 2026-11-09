@@ -124,6 +124,8 @@ const EXAMS: ExamItem[] = [
   { id: "5", title: "Đọc hiểu: Education & Technology", skill: "reading", grade: 12, questions: 10, done: false, emoji: "📖", tone: "from-sky-100 to-blue-200" },
   { id: "6", title: "Nghe hiểu: Hội thoại đời sống hằng ngày", skill: "listening", grade: 10, questions: 8, done: false, emoji: "🎧", tone: "from-emerald-100 to-teal-200" },
   { id: "7", title: "Viết lại câu — Chuyển đổi câu", skill: "writing", grade: 12, questions: 15, done: false, emoji: "✍️", tone: "from-indigo-100 to-purple-200" },
+  { id: "writing-essay", title: "Chấm bài luận VSTEP (AI)", skill: "writing", grade: 12, questions: 1, done: false, emoji: "📝", tone: "from-sky-100 to-indigo-200", href: "/writing?topic=essay-online-learning" },
+  { id: "writing-letter", title: "Chấm thư VSTEP (AI)", skill: "writing", grade: 12, questions: 1, done: false, emoji: "✉️", tone: "from-emerald-100 to-teal-200", href: "/writing?topic=letter-complaint" },
   { id: "8", title: "Đề thi thử tốt nghiệp THPT số 1", skill: "mock", grade: 12, questions: 40, done: true, attempts: 1, emoji: "🏆", tone: "from-amber-100 to-orange-200" },
 ];
 
