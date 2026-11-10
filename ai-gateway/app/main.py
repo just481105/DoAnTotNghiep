@@ -12,6 +12,9 @@ from app.schemas import (
     WritingEvaluationResponse,
 )
 from app.services.phoneme_aligner import align_and_score_phonemes
+from app.llm import LLMError, chat as llm_chat, chat_json
+from pydantic import BaseModel
+from typing import List
 
 app = FastAPI(
     title="AI Speech Gateway - English Learning Platform",
@@ -72,58 +75,93 @@ async def evaluate_pronunciation(
         raise HTTPException(status_code=500, detail=f"Lỗi phân tích âm thanh: {str(e)}")
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    context: str = ""
+
+
+class ChatResponse(BaseModel):
+    reply: str
+
+
+TUTOR_SYSTEM = (
+    "Bạn là gia sư tiếng Anh cho học sinh THPT Việt Nam. Giải thích ngắn gọn, "
+    "dễ hiểu bằng tiếng Việt, kèm ví dụ tiếng Anh. Chỉ trả lời các câu hỏi về "
+    "học tiếng Anh; câu hỏi khác thì lịch sự từ chối. Nếu không chắc, hãy nói rõ "
+    "là không chắc thay vì bịa."
+)
+
+
+@app.post("/api/v1/chat", response_model=ChatResponse)
+async def chat_endpoint(payload: ChatRequest):
+    msgs = [m.model_dump() for m in payload.messages[-12:] if m.role in ("user", "assistant")]
+    if not msgs or msgs[-1]["role"] != "user":
+        raise HTTPException(status_code=400, detail="Thiếu câu hỏi của người dùng.")
+    system = TUTOR_SYSTEM
+    if payload.context:
+        system += "\nThông tin học tập của học viên (chỉ để tham khảo):\n" + payload.context[:1500]
+    try:
+        return ChatResponse(reply=llm_chat(msgs, system))
+    except LLMError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+WRITING_SYSTEM = (
+    "Bạn là giám khảo chấm bài viết tiếng Anh theo tiêu chí VSTEP. "
+    "Chỉ trả về JSON hợp lệ, không thêm chữ nào khác."
+)
+
+
 @app.post("/api/v1/evaluate-writing", response_model=WritingEvaluationResponse)
 async def evaluate_writing(payload: WritingEvaluationRequest):
+    essay = payload.essay_text.strip()
+    if len(essay.split()) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Bài viết quá ngắn (tối thiểu 20 từ) để AI có thể đánh giá.",
+        )
+    prompt = (
+        f"Đề bài: {payload.prompt}\n\nBài làm:\n{essay[:4000]}\n\n"
+        "Chấm theo thang 0-10 và trả JSON đúng cấu trúc:\n"
+        '{"overall_score": number, "task_achievement": number, "coherence_cohesion": number, '
+        '"lexical_resource": number, "grammatical_accuracy": number, '
+        '"general_feedback": "nhận xét tiếng Việt 2-4 câu", '
+        '"better_version": "bản viết lại tự nhiên hơn bằng tiếng Anh", '
+        '"grammar_errors": [{"original_text": "đoạn sai nguyên văn trong bài", '
+        '"corrected_text": "bản sửa", "explanation": "giải thích tiếng Việt"}]}\n'
+        "Chỉ liệt kê lỗi thật sự có trong bài; nếu không có lỗi thì để mảng rỗng."
+    )
     try:
-        essay = payload.essay_text.strip()
-        word_count = len(essay.split())
-
-        if word_count < 20:
-            raise HTTPException(
-                status_code=400,
-                detail="Bài viết quá ngắn (tối thiểu 20 từ) để AI có thể đánh giá.",
+        d = chat_json(prompt, WRITING_SYSTEM)
+        errors = [
+            GrammarError(
+                original_text=str(e.get("original_text", "")),
+                corrected_text=str(e.get("corrected_text", "")),
+                explanation=str(e.get("explanation", "")),
             )
-
-        # Barem VSTEP thang 10 (tạm thời theo số từ, sẽ thay bằng LLM ở giai đoạn sau)
-        base_score = 6.0
-        if word_count >= 150:
-            base_score = 7.5
-        if word_count >= 250:
-            base_score = 8.5
-
-        detected_errors = [
-            GrammarError(
-                original_text="I am agree with",
-                corrected_text="I agree with",
-                explanation="Động từ 'agree' không đi kèm trợ động từ 'am' trong câu khẳng định hiện tại đơn.",
-            ),
-            GrammarError(
-                original_text="in the other hand",
-                corrected_text="on the other hand",
-                explanation="Cụm liên từ chuẩn xác chỉ sự đối lập là 'on the other hand'.",
-            ),
+            for e in d.get("grammar_errors", [])
+            if isinstance(e, dict)
         ]
 
-        rewritten = (
-            f"Regarding the prompt '{payload.prompt}', it is widely acknowledged that "
-            f"structured development enhances essay quality. {essay[:120]}... "
-            f"Furthermore, utilizing academic connectors substantially boosts lexical diversity."
-        )
+        def sc(k):
+            return round(max(0.0, min(10.0, float(d.get(k, 0)))), 1)
 
         return WritingEvaluationResponse(
-            overall_score=round(base_score, 1),
-            task_achievement=round(base_score - 0.2, 1),
-            coherence_cohesion=round(base_score, 1),
-            lexical_resource=round(base_score + 0.3, 1),
-            grammatical_accuracy=round(base_score - 0.1, 1),
-            general_feedback=(
-                f"Bài viết đạt {word_count} từ. Bố cục rõ ràng, lập luận có tính liên kết. "
-                "Cần chú ý thêm việc đa dạng hóa cấu trúc câu ghép/phức và sử dụng từ vựng học thuật C1."
-            ),
-            better_version=rewritten,
-            grammar_errors=detected_errors,
+            overall_score=sc("overall_score"),
+            task_achievement=sc("task_achievement"),
+            coherence_cohesion=sc("coherence_cohesion"),
+            lexical_resource=sc("lexical_resource"),
+            grammatical_accuracy=sc("grammatical_accuracy"),
+            general_feedback=str(d.get("general_feedback", "")),
+            better_version=str(d.get("better_version", "")),
+            grammar_errors=errors,
         )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi phân tích bài viết: {str(e)}")
+    except LLMError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="AI trả về kết quả chấm không hợp lệ.")
