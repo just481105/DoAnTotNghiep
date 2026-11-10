@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-const AI_GATEWAY_URL = process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8000";
+import { fetchWithAuth } from "@/services/api-client";
 
 // Sửa thành:
 interface GrammarError {
@@ -78,30 +77,26 @@ export default function WritingMentorPage() {
       setErrorMsg("Vui lòng viết tối thiểu 20 từ để AI có đủ dữ liệu phân tích.");
       return;
     }
+    if (essayContent.length > 5000) {
+      setErrorMsg("Bài viết quá dài (tối đa 5000 ký tự). Vui lòng rút gọn.");
+      return;
+    }
 
     try {
       setIsAnalyzing(true);
       setErrorMsg(null);
 
-      const res = await fetch(`${AI_GATEWAY_URL}/api/v1/evaluate-writing`, {
+      const data = await fetchWithAuth<WritingResult>("/ai/writing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: activePrompt.title + ": " + activePrompt.description,
-          essay_text: essayContent,
-          task_type: activePrompt.taskType
-        })
+          prompt: (activePrompt.title + ": " + activePrompt.description).slice(0, 1000),
+          essayText: essayContent,
+          taskType: activePrompt.taskType,
+        }),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Không thể phân tích bài viết");
-      }
-
-      const data = await res.json();
       setResult(data);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi kết nối AI Gateway (Port 8000)");
+      setErrorMsg(err.message || "Không thể chấm bài lúc này. Thử lại sau.");
     } finally {
       setIsAnalyzing(false);
     }
