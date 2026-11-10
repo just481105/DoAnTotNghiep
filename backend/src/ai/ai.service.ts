@@ -68,7 +68,10 @@ export class AiService {
     try {
       res = await fetch(`${base}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Key': this.config.get<string>('INTERNAL_API_KEY') ?? '',
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(120_000),
       });
