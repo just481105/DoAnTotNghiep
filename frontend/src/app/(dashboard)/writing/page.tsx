@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchWithAuth } from "@/services/api-client";
+import { WritingProgress } from "@/components/writing-progress";
 
 // Sửa thành:
 interface GrammarError {
@@ -66,6 +67,7 @@ export default function WritingMentorPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<WritingResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
 
   const activePrompt: PromptItem = prompts[selectedPromptIndex] ?? {
     id: "", title: "Đang tải đề...", type: "VSTEP Task 2", taskType: "VSTEP_TASK_2", description: "",
@@ -95,6 +97,7 @@ export default function WritingMentorPage() {
         }),
       });
       setResult(data);
+      setHistoryKey((k) => k + 1); // tải lại lịch sử và biểu đồ
     } catch (err: any) {
       setErrorMsg(err.message || "Không thể chấm bài lúc này. Thử lại sau.");
     } finally {
@@ -322,6 +325,9 @@ export default function WritingMentorPage() {
             </div>
           </div>
         )}
+
+        {/* Lịch sử và biểu đồ tiến bộ */}
+        <WritingProgress refreshKey={historyKey} />
       </main>
     </div>
   );
