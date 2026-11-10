@@ -1,9 +1,11 @@
+import hmac
 import io
+import os
 
 import librosa
 import soundfile as sf
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 
 from app.schemas import (
     EvaluationResponse,
@@ -21,14 +23,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS để Next.js (cổng 3000) gọi được
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Chỉ backend Nest (có khoá nội bộ) được gọi gateway; trình duyệt không gọi trực tiếp.
+# Chưa cấu hình INTERNAL_API_KEY thì từ chối tất cả, không để hở.
+@app.middleware("http")
+async def require_internal_key(request: Request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    expected = os.environ.get("INTERNAL_API_KEY", "")
+    given = request.headers.get("x-internal-key", "")
+    if not expected or not hmac.compare_digest(given.encode(), expected.encode()):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
 
 
 @app.get("/health")

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { NavigationBar } from "@/components/navigation-bar";
+import { ChatWidget } from "@/components/chat-widget";
 
 export const metadata: Metadata = {
   title: "ENG-PLATFORM | Nền tảng Học tiếng Anh Thông minh",
@@ -22,6 +23,9 @@ export default function RootLayout({
         <div className="flex-1 w-full">
           {children}
         </div>
+
+        {/* Khung chat gia sư AI, tự ẩn ở /login, /register */}
+        <ChatWidget />
       </body>
     </html>
   );

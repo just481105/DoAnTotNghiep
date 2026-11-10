@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
+import { ClipboardCheck,
   LayoutDashboard,
   Layers,
   Mic,
@@ -143,7 +143,13 @@ export function NavigationBar() {
       activeColor: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",
     },
     {
-      
+      title: "Test đầu vào",
+      href: "/placement",
+      icon: ClipboardCheck,
+      badge: "Mới",
+      activeColor: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",
+    },
+    {
       title: "Kho từ vựng",
       href: "/vocab-sets",
       icon: Layers,

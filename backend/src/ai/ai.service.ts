@@ -3,8 +3,10 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatDto, WritingDto } from './dto/ai.dto';
 
@@ -14,6 +16,7 @@ const MAX_PER_MINUTE = 10;
 export class AiService {
   // Lưu trong bộ nhớ, đủ cho đồ án một máy chủ
   private readonly hits = new Map<string, number[]>();
+  private readonly logger = new Logger(AiService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,7 +71,10 @@ export class AiService {
     try {
       res = await fetch(`${base}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Key': this.config.get<string>('INTERNAL_API_KEY') ?? '',
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(120_000),
       });
@@ -102,10 +108,56 @@ export class AiService {
 
   async evaluateWriting(userId: string, dto: WritingDto) {
     this.checkRate(userId);
-    return this.post<Record<string, unknown>>('/api/v1/evaluate-writing', {
-      prompt: dto.prompt,
-      essay_text: dto.essayText,
-      task_type: dto.taskType,
+    const result = await this.post<Record<string, unknown>>(
+      '/api/v1/evaluate-writing',
+      {
+        prompt: dto.prompt,
+        essay_text: dto.essayText,
+        task_type: dto.taskType,
+      },
+    );
+
+    // Lưu lịch sử; lỗi ghi DB không được làm hỏng kết quả chấm
+    try {
+      const num = (v: unknown) =>
+        typeof v === 'number' && Number.isFinite(v) ? v : 0;
+      await this.prisma.writingHistory.create({
+        data: {
+          userId,
+          taskType: dto.taskType,
+          prompt: dto.prompt,
+          essayText: dto.essayText,
+          overallScore: num(result.overall_score),
+          taskAchievement: num(result.task_achievement),
+          coherenceCohesion: num(result.coherence_cohesion),
+          lexicalResource: num(result.lexical_resource),
+          grammaticalAccuracy: num(result.grammatical_accuracy),
+          result: result as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      this.logger.error('Không lưu được lịch sử chấm Writing', err as Error);
+    }
+
+    return result;
+  }
+
+  getWritingHistory(userId: string, limit: number) {
+    return this.prisma.writingHistory.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 50),
+      select: {
+        id: true,
+        taskType: true,
+        prompt: true,
+        overallScore: true,
+        taskAchievement: true,
+        coherenceCohesion: true,
+        lexicalResource: true,
+        grammaticalAccuracy: true,
+        createdAt: true,
+      },
     });
   }
 }

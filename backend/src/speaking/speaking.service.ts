@@ -90,6 +90,9 @@ export class SpeakingService {
     try {
       const res = await fetch(`${base}/api/v1/evaluate-pronunciation`, {
         method: 'POST',
+        headers: {
+          'X-Internal-Key': this.config.get<string>('INTERNAL_API_KEY') ?? '',
+        },
         body: form,
         signal: AbortSignal.timeout(30_000),
       });

@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/guards/jwt-auth.guard';
@@ -18,5 +27,13 @@ export class AiController {
   @Post('writing')
   writing(@CurrentUser() user: AuthenticatedUser, @Body() dto: WritingDto) {
     return this.aiService.evaluateWriting(user.sub, dto);
+  }
+
+  @Get('writing/history')
+  writingHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    return this.aiService.getWritingHistory(user.sub, limit);
   }
 }
